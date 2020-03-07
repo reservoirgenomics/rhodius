@@ -67,10 +67,14 @@ def load_reads(samfile, start_pos, end_pos, chrom_order=None):
         "chrName": [],
         "chrOffset": [],
         "cigar": [],
+        "strand": [],
     }
 
     for cid, start, end in abs2genomic(lengths, start_pos, end_pos):
         chr_offset = int(abs_chrom_offsets[cid])
+
+        if cid >= len(references):
+            continue
 
         seq_name = f"{references[cid]}"
         reads = samfile.fetch(seq_name, start, end)
@@ -105,6 +109,7 @@ def load_reads(samfile, start_pos, end_pos, chrom_order=None):
                 results["chrName"] += [read.reference_name]
                 results["chrOffset"] += [chr_offset]
                 results["cigar"] += [read.cigarstring]
+                results["strand"] += ["-" if read.is_reverse else "+"]
             except:
                 raise
 
