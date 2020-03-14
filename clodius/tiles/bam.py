@@ -80,7 +80,6 @@ def load_reads(samfile, start_pos, end_pos, chrom_order=None):
             continue
 
         seq_name = f"{references[cid]}"
-        print("seqname:", seq_name, start, end)
         reads = samfile.fetch(seq_name, start, end)
 
         for read in reads:
