@@ -67,7 +67,10 @@ def load_reads(samfile, start_pos, end_pos, chrom_order=None):
         "chrName": [],
         "chrOffset": [],
         "cigar": [],
-        "strand": [],
+        "m1From": [],
+        "m1To": [],
+        "m2From": [],
+        "m2To": [],
     }
 
     for cid, start, end in abs2genomic(lengths, start_pos, end_pos):
@@ -77,6 +80,7 @@ def load_reads(samfile, start_pos, end_pos, chrom_order=None):
             continue
 
         seq_name = f"{references[cid]}"
+        print("seqname:", seq_name, start, end)
         reads = samfile.fetch(seq_name, start, end)
 
         for read in reads:
@@ -103,13 +107,20 @@ def load_reads(samfile, start_pos, end_pos, chrom_order=None):
             #     # probably lacked an MD string
             #     pass
             try:
-                results["id"] += [read.query_name]
+                id_suffix = ""
+
+                if read.is_paired:
+                    if read.is_read1:
+                        id_suffix = "_1"
+                    if read.is_read2:
+                        id_suffix = "_2"
+
+                results["id"] += [read.query_name + id_suffix]
                 results["from"] += [int(read.reference_start + chr_offset)]
                 results["to"] += [int(read.reference_end + chr_offset)]
                 results["chrName"] += [read.reference_name]
                 results["chrOffset"] += [chr_offset]
                 results["cigar"] += [read.cigarstring]
-                results["strand"] += ["-" if read.is_reverse else "+"]
             except:
                 raise
 
