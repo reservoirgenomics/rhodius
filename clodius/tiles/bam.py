@@ -161,6 +161,9 @@ def tileset_info(filename):
     tile_size = 256
     max_zoom = math.ceil(math.log(total_length / tile_size) / math.log(2))
 
+    # this should eventually be a configurable option
+    MAX_TILE_WIDTH = 100000
+
     tileset_info = {
         "min_pos": [0],
         "max_pos": [total_length],
@@ -168,6 +171,7 @@ def tileset_info(filename):
         "tile_size": tile_size,
         "chromsizes": list(zip(references, [int(l) for l in lengths])),
         "max_zoom": max_zoom,
+        "max_tile_width": MAX_TILE_WIDTH,
     }
 
     return tileset_info

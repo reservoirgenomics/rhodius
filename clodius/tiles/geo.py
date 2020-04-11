@@ -57,9 +57,13 @@ def tileset_info(filepath):
     if not os.path.isfile(filepath):
         return {"error": "Tileset info is not available!"}
 
-    db = sqlite3.connect(filepath)
+    conn = sqlite3.connect(filepath)
+    c = conn.cursor()
 
-    res = db.execute("SELECT * FROM tileset_info").fetchone()
+    # c.execute('PRAGMA journal_mode=off')
+    # c.fetchone()
+    c.execute("SELECT * FROM tileset_info")
+    res = c.fetchone()
 
     o = {
         "zoom_step": res[0],
@@ -99,7 +103,9 @@ def get_tiles(db_file, zoom, x, y, width=1, height=1):
     """
     conn = sqlite3.connect(db_file)
 
-    c = conn.cursor()
+    cursor = conn.cursor()
+    # cursor.execute('PRAGMA journal_mode=OFF')
+    # cursor.fetchone()
 
     lng_from, _, lat_from, _ = get_tile_box(zoom, x, y)
     _, lng_to, _, lat_to = get_tile_box(zoom, x + width - 1, y + height - 1)
@@ -125,7 +131,7 @@ def get_tiles(db_file, zoom, x, y, width=1, height=1):
         rMaxLat >= ?
     """
 
-    rows = c.execute(query, (zoom, lng_from, lng_to, lat_from, lat_to)).fetchall()
+    rows = cursor .execute(query, (zoom, lng_from, lng_to, lat_from, lat_to)).fetchall()
 
     new_rows = col.defaultdict(list)
 

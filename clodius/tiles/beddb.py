@@ -4,6 +4,8 @@ import sqlite3
 def tileset_info(db_file):
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
+    # cursor.execute('PRAGMA journal_mode=OFF')
+    # cursor.fetchone()
 
     row = cursor.execute("SELECT * from tileset_info").fetchone()
 
@@ -107,6 +109,8 @@ def get_1D_tiles(db_file, zoom, tile_x_pos, num_tiles=1):
     conn = sqlite3.connect(db_file)
 
     c = conn.cursor()
+    cursor.execute('PRAGMA journal_mode=OFF')
+    cursor.fetchone()
 
     tile_width = ts_info["max_width"] / 2 ** zoom
 
