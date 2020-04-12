@@ -108,7 +108,7 @@ def get_1D_tiles(db_file, zoom, tile_x_pos, num_tiles=1):
 
     conn = sqlite3.connect(db_file)
 
-    c = conn.cursor()
+    cursor = conn.cursor()
     cursor.execute('PRAGMA journal_mode=OFF')
     cursor.fetchone()
 
@@ -159,7 +159,7 @@ def get_1D_tiles(db_file, zoom, tile_x_pos, num_tiles=1):
 
     # import time
     # t1 = time.time()
-    rows = c.execute(query).fetchall()
+    rows = cursor.execute(query).fetchall()
     # t2 = time.time()
 
     new_rows = []
