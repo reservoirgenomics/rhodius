@@ -2,9 +2,11 @@ import bbi
 import functools as ft
 import logging
 import numpy as np
+import numpy.random as nr
 import pandas as pd
 import random
 import clodius.tiles.bigwig as hgbw
+import slugid
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -112,6 +114,12 @@ def fetch_data(a):
     intervals_length = 0
     scores = []
 
+    return [{
+        'chrOffset': chrOffsets[chrom],
+        'importance': random.random(),
+        'fields': interval
+    } for interval in intervals2]
+
     if not intervals:
         return final_intervals
 
@@ -121,6 +129,7 @@ def fetch_data(a):
         except (ValueError, IndexError):
             scores.append(DEFAULT_SCORE)
         intervals_length += 1
+
 
     # generate beddb-like elements for parsing by the higlass plugin
     if intervals_length >= min_elements and intervals_length <= max_elements:
@@ -197,31 +206,55 @@ def get_bigbed_tile(
     binsize = resolutions[zoom_level]
 
     cids_starts_ends = list(hgbw.abs2genomic(chromsizes, start_pos, end_pos))
+    results = []
 
-    with ThreadPoolExecutor(max_workers=16) as e:
-        arrays = list(
-            e.map(
-                fetch_data,
-                [
-                    tuple(
-                        [
-                            bbpath,
-                            binsize,
-                            chromsizes,
-                            range_mode,
-                            min_elements,
-                            max_elements,
-                        ]
-                        + list(c)
-                    )
-                    for c in cids_starts_ends
-                ],
-            )
+    offset = 0
+    offsetIdx = 0
+    chrOffsets = {}
+    for chrSize in chromsizes:
+        chrOffsets[chromsizes.index[offsetIdx]] = offset
+        offset += chrSize
+        offsetIdx += 1
+
+    intervals = []
+
+    total_length = sum([c[2] - c[1] for c in cids_starts_ends])
+    probs = [(c[2] - c[1]) / total_length for c in cids_starts_ends]
+
+    NUM_TO_PICK = 128
+    if NUM_TO_PICK < len(probs):
+        rnds_ixs = nr.choice(
+            len(cids_starts_ends), NUM_TO_PICK, p=probs,
+            replace=NUM_TO_PICK
+        )
+        chosen_starts_ends = [cids_starts_ends[ix] for ix in rnds_ixs]
+    else:
+        chosen_starts_ends = cids_starts_ends
+
+    for c in chosen_starts_ends:
+        if c[0] >= len(chromsizes):
+            continue
+        intervals += bbi.fetch_intervals(
+            bbpath,
+            chromsizes.index[c[0]],
+            c[1], c[2]
         )
 
-    # concatenate bigBed tileset data across chromosomes, so that it looks similar to a beddb response
-    results = [x for x in arrays if x != []]
-    return [item for sublist in results for item in sublist]
+    MAX_RET = 100
+
+    if len(intervals) > MAX_RET:
+        chosen_intervals = random.choices(intervals, k=MAX_RET)
+    else:
+        chosen_intervals = intervals
+
+    all_intervals = [{
+        'chrOffset': chrOffsets[interval[0]],
+        'importance': random.random(),
+        'uid': slugid.nice(),
+        'fields': interval
+    } for interval in chosen_intervals]
+
+    return all_intervals
 
 
 def tiles(bbpath, tile_ids, chromsizes_map={}, chromsizes=None):
