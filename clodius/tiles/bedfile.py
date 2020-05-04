@@ -83,7 +83,7 @@ def single_tile(filename, chromsizes, tsinfo, z, x):
     ret = t.apply(row_to_bedlike, axis=1)
     return list(ret.values)
 
-def tiles(filename, tile_ids, chromsizes_map, chromsizes=None):
+def tiles(filename, tile_ids, chromsizes):
     tsinfo = tileset_info(filename, chromsizes)
 
     tile_values = []
@@ -98,16 +98,6 @@ def tiles(filename, tile_ids, chromsizes_map, chromsizes=None):
         if len(tile_position) < 2:
             raise IndexError("Not enough tile info present")
 
-        chromsizes_id = None
-        if "cos" in tile_options:
-            chromsizes_id = tile_options["cos"]
-        if chromsizes_id in chromsizes_map:
-            chromsizes_to_use = chromsizes_map[chromsizes_id]
-        else:
-            chromsizes_to_use = None
-
-        if not chromsizes_to_use:
-            chromsizes_to_use = chromsizes
 
         z = tile_position[0]
         x = tile_position[1]
