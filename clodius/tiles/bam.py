@@ -43,15 +43,12 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
     # if chromorder is not None...
     # specify the chromosome order for the fetched reads
 
-    if chromsizes:
+
+    if chromsizes is not None:
         chromsizes_list = []
 
         for chrom, size in chromsizes.iteritems():
-            references += [chrom]
-            lengths += [size]
             chromsizes_list += [[chrom, int(size)]]
-
-        abs_chrom_offsets = chromsizes.cumsum().shift().fillna(0).to_dict()
     else:
         references = np.array(samfile.references)
         lengths = np.array(samfile.lengths)
@@ -62,7 +59,9 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
         # e.g. (chr1, chr2,..., chr10, chr11...chr22,chrX, chrY, chrM...)
         references = ctbw.natsorted(references)
         lengths = [ref_lengths[r] for r in references]
+        chromsizes_list = list(zip(references, [int(l) for l in lengths]))
 
+    lengths = [r[1] for r in chromsizes_list]
     abs_chrom_offsets = np.r_[0, np.cumsum(lengths)]
 
     results = {
@@ -82,10 +81,10 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
     for cid, start, end in abs2genomic(lengths, start_pos, end_pos):
         chr_offset = int(abs_chrom_offsets[cid])
 
-        if cid >= len(references):
+        if cid >= len(chromsizes_list):
             continue
 
-        seq_name = f"{references[cid]}"
+        seq_name = f"{chromsizes_list[cid][0]}"
         reads = samfile.fetch(seq_name, start, end)
 
         for read in reads:
@@ -155,7 +154,7 @@ def tileset_info(filename, chromsizes):
                     'max_zoom': 7
                     }
     """
-    if chromsizes:
+    if chromsizes is not None:
         chromsizes_list = []
 
         for chrom, size in chromsizes.iteritems():
@@ -173,6 +172,7 @@ def tileset_info(filename, chromsizes):
         references = ctbw.natsorted(references)
 
         lengths = [ref_lengths[r] for r in references]
+        chromsizes_list = list(zip(references, [int(l) for l in lengths]))
 
     tile_size = 256
     max_zoom = math.ceil(math.log(total_length / tile_size) / math.log(2))
@@ -185,7 +185,7 @@ def tileset_info(filename, chromsizes):
         "max_pos": [total_length],
         "max_width": tile_size * 2 ** max_zoom,
         "tile_size": tile_size,
-        "chromsizes": list(zip(references, [int(l) for l in lengths])),
+        "chromsizes": chromsizes_list,
         "max_zoom": max_zoom,
         "max_tile_width": MAX_TILE_WIDTH,
     }
