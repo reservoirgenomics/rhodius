@@ -76,6 +76,14 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
         "m1To": [],
         "m2From": [],
         "m2To": [],
+        "mapq": [],
+        "tags.HP": [],
+        "strand": []
+    }
+
+    strands = {
+        True: '-',
+        False: '+'
     }
 
     for cid, start, end in abs2genomic(lengths, start_pos, end_pos):
@@ -112,7 +120,6 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
             #     pass
             try:
                 id_suffix = ""
-
                 if read.is_paired:
                     if read.is_read1:
                         id_suffix = "_1"
@@ -125,6 +132,11 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
                 results["chrName"] += [read.reference_name]
                 results["chrOffset"] += [chr_offset]
                 results["cigar"] += [read.cigarstring]
+                results['mapq'] += [read.mapq]
+
+                tags = dict(read.tags)
+                results['tags.HP'] += [tags.get('HP', 0)]
+                results['strand'] += [strands[read.is_reverse]]
             except:
                 raise
 
@@ -154,6 +166,8 @@ def tileset_info(filename, chromsizes):
                     'max_zoom': 7
                     }
     """
+    print("filename:", filename)
+
     if chromsizes is not None:
         chromsizes_list = []
 
