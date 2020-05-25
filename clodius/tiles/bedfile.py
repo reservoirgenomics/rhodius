@@ -1,8 +1,39 @@
+import functools as ft
+import hashlib
 import math
+import os
 import pandas as pd
 import random
 
-def tileset_info(filename, chromsizes):
+cache = []
+
+class LRUCache:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.tm = 0
+        self.cache = {}
+        self.lru = {}
+
+    def get(self, key):
+        if key in self.cache:
+            self.lru[key] = self.tm
+            self.tm += 1
+            return self.cache[key]
+        return None
+
+    def set(self, key, value):
+        if len(self.cache) >= self.capacity:
+            # find the LRU entry
+            old_key = min(self.lru.keys(), key=lambda k:self.lru[k])
+            self.cache.pop(old_key)
+            self.lru.pop(old_key)
+        self.cache[key] = value
+        self.lru[key] = self.tm
+        self.tm += 1
+
+cache = LRUCache(5)
+
+def tileset_info(filename, chromsizes=None):
     """
 
     Return the bounds of this tileset. The bounds should encompass the entire
@@ -16,10 +47,16 @@ def tileset_info(filename, chromsizes):
     # do this so that we can serialize the int64s in the numpy array
     chromsizes_list = []
 
+    if chromsizes is None:
+        return {'error': "No chromsizes found. Make sure the assembly: tag is set"}
+
     for chrom, size in chromsizes.iteritems():
         chromsizes_list += [[chrom, int(size)]]
 
     max_width = sum([c[1] for c in chromsizes_list])
+
+    if os.stat(filename).st_size > 50e6:
+        return { 'error': "File too large, please index" }
 
     return {
         "max_width": max_width,
@@ -29,59 +66,78 @@ def tileset_info(filename, chromsizes):
         "max_pos": [max_width]
     }
 
-# def tiles_wrapper(array, tile_ids, not_nan_array=None):
-#     tile_values = []
 
-#     for tile_id in tile_ids:
-#         parts = tile_id.split(".")
+def row_to_bedlike(row, css, orig_columns):
+    ret = {
+        'uid': row['ix'],
+        'xStart': row['xStart'],
+        'xEnd': row['xEnd'],
+        'chrOffset': css[row[0]],
+        'importance': random.random(),
+        'fields': [r for r in row[orig_columns]]
+    }
 
-#         if len(parts) < 3:
-#             raise IndexError("Not enough tile info present")
+    return ret
 
-#         z = int(parts[1])
-#         x = int(parts[2])
+def get_compression(filename):
+    if filename.endswith('.gz..') or filename.endswith('.gz'):
+        return 'gzip'
+    elif filename.endswith('.bz2..') or filename.endswith('.bz2'):
+        return 'bz2'
+    elif filename.endswith('.zip..') or filename.endswith('.zip'):
+        return 'zip'
+    elif filename.endswith('.xz..') or filename.endswith('xz'):
+        return 'xz'
+    else:
+        return None
 
-#         ret_array = tiles(array, z, x, not_nan_array).reshape((-1))
-
-#         tile_values += [(tile_id, ctf.format_dense_tile(ret_array))]
-
-#     return tile_values
+def ts_hash(filename, chromsizes):
+    cs_hash = hashlib.md5(str(chromsizes).encode('utf-8')).hexdigest()
+    return f'{filename}.{cs_hash}'
 
 def single_tile(filename, chromsizes, tsinfo, z, x):
-    t = pd.read_csv(filename, header=None, delimiter='\t')
-    orig_columns = t.columns
+    hash_ = ts_hash(filename, chromsizes)
 
-    css = chromsizes.cumsum().shift().fillna(0).to_dict()
+    # hash the loaded data table so that we don't have to read the entire thing
+    # and calculate cumulative start and end positions
+    val = cache.get(hash_)
 
-    t[3] = t[0].map(lambda x: css[x])
-    t['xStart'] = t[3] + t[1]
-    t['xEnd'] = t[3] + t[2]
-    t['ix'] = t.index
+    if val is None:
+        t = pd.read_csv(filename, header=None, delimiter='\t', compression=get_compression(filename))
+        cache.set(hash_, t)
+
+        orig_columns = t.columns
+        css = chromsizes.cumsum().shift().fillna(0).to_dict()
+
+        # xStart and xEnd are cumulative start and end positions calculated
+        # as if the chromosomes are concatenated from end to end
+        t['chromStart'] = t[0].map(lambda x: css[x])
+        t['xStart'] = t['chromStart'] + t[1]
+        t['xEnd'] = t['chromStart'] + t[2]
+        t['ix'] = t.index
+
+        val = {
+            "rows": t,
+            "orig_columns": orig_columns,
+            'css': css
+        }
+        cache.set(hash_, val)
+
+    t = val['rows']
+    orig_columns = val['orig_columns']
+    css = val['css']
 
     tileStart = x * tsinfo['max_width'] / 2**z
     tileEnd = (x+1) * tsinfo['max_width'] / 2**z
 
-    t = t[t['xEnd'] >= tileStart]
-    t = t[t['xStart'] <= tileEnd]
-
+    t = t.query(f'xEnd >= {tileStart} & xStart <= {tileEnd}')
     MAX_PER_TILE = 128
 
     t = t.sample(MAX_PER_TILE) if len(t) > MAX_PER_TILE else t
 
-    def row_to_bedlike(row):
-        ret = {
-            'uid': row['ix'],
-            'xStart': row['xStart'],
-            'xEnd': row['xEnd'],
-            'chrOffset': css[row[0]],
-            'importance': random.random(),
-            'fields': [r for r in row[orig_columns]]
-        }
-
-        return ret
-
-    ret = t.apply(row_to_bedlike, axis=1)
+    ret = t.apply(ft.partial(row_to_bedlike, css=css, orig_columns=orig_columns), axis=1)
     return list(ret.values)
+
 
 def tiles(filename, tile_ids, chromsizes):
     tsinfo = tileset_info(filename, chromsizes)
