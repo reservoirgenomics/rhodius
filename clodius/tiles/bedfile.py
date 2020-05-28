@@ -55,7 +55,7 @@ def tileset_info(filename, chromsizes=None):
 
     max_width = sum([c[1] for c in chromsizes_list])
 
-    if os.stat(filename).st_size > 50e6:
+    if os.stat(filename).st_size > 100e6:
         return { 'error': "File too large, please index" }
 
     return {
@@ -104,6 +104,7 @@ def single_tile(filename, chromsizes, tsinfo, z, x):
 
     if val is None:
         t = pd.read_csv(filename, header=None, delimiter='\t', compression=get_compression(filename))
+
         cache.set(hash_, t)
 
         orig_columns = t.columns
