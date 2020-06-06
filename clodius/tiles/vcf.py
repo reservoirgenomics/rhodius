@@ -1,6 +1,9 @@
 import math
 import pandas as pd
 import random
+
+import clodius.tiles.tabix as rtt
+
 from pysam import VariantFile
 
 from clodius.tiles.bigwig import abs2genomic
@@ -52,13 +55,15 @@ def tileset_info(filename, chromsizes):
 
 #     return tile_values
 
-def single_tile(filename, index_filename, chromsizes, tsinfo, z, x, max_tile_width):
+def single_tile(filename, index_filename, chromsizes, tsinfo, z, x, max_tile_width, tbx_index=None):
     tile_width = tsinfo['max_width'] / 2 ** z
 
-    if tile_width > max_tile_width:
+    if max_tile_width and tile_width > max_tile_width:
         return {
             "error": "Tile too wide"
         }
+
+    query_size = 0
 
     vcf = VariantFile(filename, index_filename=index_filename)  # auto-detect input format
 
@@ -69,6 +74,19 @@ def single_tile(filename, index_filename, chromsizes, tsinfo, z, x, max_tile_wid
 
     cids_starts_ends = list(abs2genomic(chromsizes, start_pos, end_pos))
     ret_vals = []
+
+    if tbx_index:
+        for (cid, start, end) in cids_starts_ends:
+            chrom = chromsizes.index[cid]
+
+            query_size += rtt.est_query_size(tbx_index, chrom, int(start), int(end))
+
+    MAX_QUERY_SIZE = 450000
+
+    if query_size > MAX_QUERY_SIZE:
+        return {
+            "error": f"Tile too large {query_size}"
+        }
 
     for (cid, start, end) in cids_starts_ends:
         chrom = chromsizes.index[cid]
@@ -90,6 +108,11 @@ def tiles(filename, tile_ids, index_filename, chromsizes, max_tile_width=None):
     tsinfo = tileset_info(filename, chromsizes)
 
     tile_values = []
+
+    index = None
+    if index_filename:
+        index = rtt.load_tbi_idx(index_filename)
+
 
     for tile_id in tile_ids:
         tile_option_parts = tile_id.split("|")[1:]
@@ -117,7 +140,7 @@ def tiles(filename, tile_ids, index_filename, chromsizes, max_tile_width=None):
         x = tile_position[1]
 
         values = single_tile(
-            filename, index_filename, chromsizes, tsinfo, z, x, max_tile_width
+            filename, index_filename, chromsizes, tsinfo, z, x, max_tile_width, tbx_index=index
         )
 
         tile_values += [(tile_id, values)]
