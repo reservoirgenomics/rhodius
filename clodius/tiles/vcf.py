@@ -8,6 +8,7 @@ from pysam import VariantFile
 
 from clodius.tiles.bigwig import abs2genomic
 
+
 def tileset_info(filename, chromsizes):
     """
 
@@ -37,6 +38,7 @@ def tileset_info(filename, chromsizes):
         "max_tile_width": MAX_TILE_WIDTH,
     }
 
+
 # def tiles_wrapper(array, tile_ids, not_nan_array=None):
 #     tile_values = []
 
@@ -55,22 +57,26 @@ def tileset_info(filename, chromsizes):
 
 #     return tile_values
 
-def single_tile(filename, index_filename, chromsizes, tsinfo, z, x, max_tile_width, tbx_index=None):
-    tile_width = tsinfo['max_width'] / 2 ** z
+
+def single_tile(
+    filename, index_filename, chromsizes, tsinfo, z, x, max_tile_width, tbx_index=None
+):
+    # TODO: replace this function with the one in clodius.tiles.tabix
+    tile_width = tsinfo["max_width"] / 2 ** z
 
     if max_tile_width and tile_width > max_tile_width:
-        return {
-            "error": "Tile too wide"
-        }
+        return {"error": "Tile too wide"}
 
     query_size = 0
 
-    vcf = VariantFile(filename, index_filename=index_filename)  # auto-detect input format
-
-    start_pos = x * tsinfo['max_width'] / 2**z
-    end_pos = (x+1) * tsinfo['max_width'] / 2**z
+    start_pos = x * tsinfo["max_width"] / 2 ** z
+    end_pos = (x + 1) * tsinfo["max_width"] / 2 ** z
 
     css = chromsizes.cumsum().shift().fillna(0).to_dict()
+
+    vcf = VariantFile(
+        filename, index_filename=index_filename
+    )  # auto-detect input format
 
     cids_starts_ends = list(abs2genomic(chromsizes, start_pos, end_pos))
     ret_vals = []
@@ -84,25 +90,24 @@ def single_tile(filename, index_filename, chromsizes, tsinfo, z, x, max_tile_wid
     MAX_QUERY_SIZE = 450000
 
     if query_size > MAX_QUERY_SIZE:
-        return {
-            "error": f"Tile too large {query_size}"
-        }
+        return {"error": f"Tile too large {query_size}"}
 
     for (cid, start, end) in cids_starts_ends:
         chrom = chromsizes.index[cid]
         ret_vals += [
             {
-                'uid': r.id,
-                'importance': random.random(),
-                'xStart': css[chrom] + r.start,
-                'xEnd': css[chrom] + r.stop,
-                'chrOffset': css[chrom],
-                "fields": [r.chrom, r.start, r.stop, str(r)]
-            } for r in
-            vcf.fetch(str(chrom), int(start), int(end))
+                "uid": r.id,
+                "importance": random.random(),
+                "xStart": css[chrom] + r.start,
+                "xEnd": css[chrom] + r.stop,
+                "chrOffset": css[chrom],
+                "fields": [r.chrom, r.start, r.stop, str(r)],
+            }
+            for r in vcf.fetch(str(chrom), int(start), int(end))
         ]
 
     return ret_vals
+
 
 def tiles(filename, tile_ids, index_filename, chromsizes, max_tile_width=None):
     tsinfo = tileset_info(filename, chromsizes)
@@ -112,7 +117,6 @@ def tiles(filename, tile_ids, index_filename, chromsizes, max_tile_width=None):
     index = None
     if index_filename:
         index = rtt.load_tbi_idx(index_filename)
-
 
     for tile_id in tile_ids:
         tile_option_parts = tile_id.split("|")[1:]
@@ -140,7 +144,14 @@ def tiles(filename, tile_ids, index_filename, chromsizes, max_tile_width=None):
         x = tile_position[1]
 
         values = single_tile(
-            filename, index_filename, chromsizes, tsinfo, z, x, max_tile_width, tbx_index=index
+            filename,
+            index_filename,
+            chromsizes,
+            tsinfo,
+            z,
+            x,
+            max_tile_width,
+            tbx_index=index,
         )
 
         tile_values += [(tile_id, values)]
