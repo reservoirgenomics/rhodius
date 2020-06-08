@@ -127,16 +127,14 @@ def single_indexed_tile(filename, index_filename, chromsizes, tsinfo, z, x, tbx_
 
     for row in res:
         parts = row.split("\t")
-        ret = [
-            {
-                "uid": slugid.nice(),
-                "xStart": css[parts[0]] + int(parts[1]),
-                "xEnd": css[parts[0]] + int(parts[2]),
-                "chrOffset": css[parts[0]],
-                "importance": random.random(),
-                "fields": parts,
-            }
-        ]
+        ret = {
+            "uid": slugid.nice(),
+            "xStart": css[parts[0]] + int(parts[1]),
+            "xEnd": css[parts[0]] + int(parts[2]),
+            "chrOffset": css[parts[0]],
+            "importance": random.random(),
+            "fields": parts,
+        }
         formatted += [ret]
 
     return formatted
@@ -187,7 +185,7 @@ def single_tile(filename, chromsizes, tsinfo, z, x):
     return list(ret.values)
 
 
-def tiles(filename, index_filename, tile_ids, chromsizes):
+def tiles(filename, tile_ids, chromsizes, index_filename):
     tsinfo = tileset_info(filename, chromsizes, index_filename)
 
     tile_values = []
