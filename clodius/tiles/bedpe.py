@@ -71,8 +71,8 @@ def tileset_info(filename, chromsizes=None, index_filename=None):
         "max_width": max_width,
         "max_zoom": int(math.log(max_width) / math.log(2)),
         "chromsizes": chromsizes_list,
-        "min_pos": [0],
-        "max_pos": [max_width],
+        "min_pos": [0, 0],
+        "max_pos": [max_width, max_width],
     }
 
 
@@ -107,43 +107,7 @@ def ts_hash(filename, chromsizes):
     return f"{filename}.{cs_hash}"
 
 
-def single_indexed_tile(filename, index_filename, chromsizes, tsinfo, z, x, tbx_index):
-    """Retrieve a single tile from an indexed bedfile."""
-    tb = pysam.TabixFile(filename, index=index_filename)
-    css = chromsizes.cumsum().shift().fillna(0).to_dict()
-
-    def fetcher(ref, start, end):
-        return tb.fetch(ref, start, end)
-
-    try:
-        res = ctt.single_indexed_tile(
-            filename, index_filename, chromsizes, tsinfo, z, x, None, tbx_index, fetcher
-        )
-    except ValueError as err:
-        return {"error": str(err)}
-
-    formatted = []
-
-    if "error" in res:
-        # tile probably too large
-        return res
-
-    for row in res:
-        parts = row.split("\t")
-        ret = {
-            "uid": slugid.nice(),
-            "xStart": css[parts[0]] + int(parts[1]),
-            "xEnd": css[parts[0]] + int(parts[2]),
-            "chrOffset": css[parts[0]],
-            "importance": random.random(),
-            "fields": parts,
-        }
-        formatted += [ret]
-
-    return formatted
-
-
-def single_tile(filename, chromsizes, tsinfo, z, x):
+def single_tile(filename, chromsizes, tsinfo, z, x, y):
     hash_ = ts_hash(filename, chromsizes)
 
     # hash the loaded data table so that we don't have to read the entire thing
@@ -162,9 +126,15 @@ def single_tile(filename, chromsizes, tsinfo, z, x):
 
         # xStart and xEnd are cumulative start and end positions calculated
         # as if the chromosomes are concatenated from end to end
-        t["chromStart"] = t[0].map(lambda x: css[x])
-        t["xStart"] = t["chromStart"] + t[1]
-        t["xEnd"] = t["chromStart"] + t[2]
+        t["xChromStart"] = t[0].map(lambda x: css[x])
+        t["yChromStart"] = t[3].map(lambda x: css[x])
+
+        t["xStart"] = t["xChromStart"] + t[1]
+        t["xEnd"] = t["xChromStart"] + t[2]
+
+        t["yStart"] = t["yChromStart"] + t[4]
+        t["yEnd"] = t["yChromStart"] + t[5]
+
         t["ix"] = t.index
 
         val = {"rows": t, "orig_columns": orig_columns, "css": css}
@@ -174,11 +144,17 @@ def single_tile(filename, chromsizes, tsinfo, z, x):
     orig_columns = val["orig_columns"]
     css = val["css"]
 
-    tileStart = x * tsinfo["max_width"] / 2 ** z
-    tileEnd = (x + 1) * tsinfo["max_width"] / 2 ** z
+    xTileStart = x * tsinfo["max_width"] / 2 ** z
+    xTileEnd = (x + 1) * tsinfo["max_width"] / 2 ** z
 
-    t = t.query(f"xEnd >= {tileStart} & xStart <= {tileEnd}")
-    MAX_PER_TILE = 128
+    yTileStart = y * tsinfo["max_width"] / 2 ** z
+    yTileEnd = (y + 1) * tsinfo["max_width"] / 2 ** z
+
+    t = t.query(
+        f"xEnd >= {xTileStart} & xStart <= {xTileEnd} & "
+        + f"yEnd >= {yTileStart} & yStart <= {yTileEnd}"
+    )
+    MAX_PER_TILE = 512
 
     t = t.sample(MAX_PER_TILE) if len(t) > MAX_PER_TILE else t
 
@@ -204,18 +180,14 @@ def tiles(filename, tile_ids, chromsizes, index_filename):
         tile_position = list(map(int, tile_id_parts[1:3]))
         tile_options = dict([o.split(":") for o in tile_option_parts])
 
-        if len(tile_position) < 2:
+        if len(tile_position) < 3:
             raise IndexError("Not enough tile info present")
 
         z = tile_position[0]
         x = tile_position[1]
+        y = tile_position[2]
 
-        if index_filename:
-            values = single_indexed_tile(
-                filename, index_filename, chromsizes, tsinfo, z, x, tbx_index=index
-            )
-        else:
-            values = single_tile(filename, chromsizes, tsinfo, z, x)
+        values = single_tile(filename, chromsizes, tsinfo, z, x, y)
 
         tile_values += [(tile_id, values)]
 

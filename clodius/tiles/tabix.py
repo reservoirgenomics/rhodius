@@ -144,7 +144,7 @@ def single_indexed_tile(
 
             query_size += est_query_size(tbx_index, chrom, int(start), int(end))
 
-    MAX_QUERY_SIZE = 450000
+    MAX_QUERY_SIZE = 200000
 
     if query_size > MAX_QUERY_SIZE:
         return {"error": f"Tile too large {query_size}"}
