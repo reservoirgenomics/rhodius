@@ -41,7 +41,7 @@ class LRUCache:
 cache = LRUCache(1)
 
 
-def tileset_info(filename, chromsizes=None, index_filename=None):
+def tileset_info(filename, chromsizes=None):
     """
 
     Return the bounds of this tileset. The bounds should encompass the entire
@@ -55,6 +55,18 @@ def tileset_info(filename, chromsizes=None, index_filename=None):
     # do this so that we can serialize the int64s in the numpy array
     chromsizes_list = []
 
+    t = pd.read_csv(filename, nrows=2, sep="\t", comment="#", header=None)
+    t_head = pd.read_csv(
+        filename, nrows=2, sep="\t", comment="#", header=None, skiprows=1
+    )
+
+    if (t.dtypes == t_head.dtypes).all():
+        has_header = False
+        header = ""
+    else:
+        header = "\t".join(t.head().values[0])
+        has_header = True
+
     if chromsizes is None:
         return {"error": "No chromsizes found. Make sure the assembly: tag is set"}
 
@@ -63,17 +75,19 @@ def tileset_info(filename, chromsizes=None, index_filename=None):
 
     max_width = sum([c[1] for c in chromsizes_list])
 
-    if not index_filename:
-        if os.stat(filename).st_size > 10e6:
-            return {"error": "File too large (>10Mb), please index"}
+    if os.stat(filename).st_size > 10e6:
+        return {"error": "File too large (>10Mb), please index"}
 
-    return {
+    tsinfo = {
         "max_width": max_width,
         "max_zoom": int(math.log(max_width) / math.log(2)),
         "chromsizes": chromsizes_list,
         "min_pos": [0, 0],
         "max_pos": [max_width, max_width],
+        "header": header,
     }
+
+    return tsinfo
 
 
 def row_to_bedlike(row, css, orig_columns):
@@ -115,8 +129,18 @@ def single_tile(filename, chromsizes, tsinfo, z, x, y):
     val = cache.get(hash_)
 
     if val is None:
+        skiprows = 0
+
+        # if this file has a header, skip the first row
+        if len(tsinfo["header"]):
+            skiprows = 1
+
         t = pd.read_csv(
-            filename, header=None, delimiter="\t", compression=get_compression(filename)
+            filename,
+            header=None,
+            delimiter="\t",
+            compression=get_compression(filename),
+            skiprows=skiprows,
         )
 
         cache.set(hash_, t)
@@ -164,20 +188,16 @@ def single_tile(filename, chromsizes, tsinfo, z, x, y):
     return list(ret.values)
 
 
-def tiles(filename, tile_ids, chromsizes, index_filename):
-    tsinfo = tileset_info(filename, chromsizes, index_filename)
+def tiles(filename, tile_ids, chromsizes):
+    tsinfo = tileset_info(filename, chromsizes)
 
     tile_values = []
-
-    index = None
-    if index_filename:
-        index = ctt.load_tbi_idx(index_filename)
 
     for tile_id in tile_ids:
         tile_option_parts = tile_id.split("|")[1:]
         tile_no_options = tile_id.split("|")[0]
         tile_id_parts = tile_no_options.split(".")
-        tile_position = list(map(int, tile_id_parts[1:3]))
+        tile_position = list(map(int, tile_id_parts[1:4]))
         tile_options = dict([o.split(":") for o in tile_option_parts])
 
         if len(tile_position) < 3:
