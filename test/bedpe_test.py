@@ -29,8 +29,9 @@ def test_bedpe_tileset_info(filename, header):
     assert tileset_info["header"] == header
 
 
-def test_bedpe_tiles():
-    input_file = op.join(testdir, "sample_data", "isidro.bedpe")
+@pytest.mark.parametrize("filename", [("hg19_myc.bedpe")])
+def test_bedpe_tiles(filename):
+    input_file = op.join(testdir, "sample_data", filename)
     chromsizes_fn = op.join(testdir, "sample_data", "b37.chrom.sizes")
 
     chromsizes = cs.chromsizes_as_series(chromsizes_fn)

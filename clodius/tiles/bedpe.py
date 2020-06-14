@@ -95,7 +95,10 @@ def row_to_bedlike(row, css, orig_columns):
         "uid": row["ix"],
         "xStart": row["xStart"],
         "xEnd": row["xEnd"],
-        "chrOffset": css[row[0]],
+        "yStart": row["yStart"],
+        "yEnd": row["yEnd"],
+        "xChrOffset": css[str(row[0])],
+        "yChrOffset": css[str(row[3])],
         "importance": random.random(),
         "fields": [r for r in row[orig_columns]],
     }
@@ -138,7 +141,8 @@ def single_tile(filename, chromsizes, tsinfo, z, x, y):
         t = pd.read_csv(
             filename,
             header=None,
-            delimiter="\t",
+            comment="#",
+            sep="\t",
             compression=get_compression(filename),
             skiprows=skiprows,
         )
@@ -150,8 +154,12 @@ def single_tile(filename, chromsizes, tsinfo, z, x, y):
 
         # xStart and xEnd are cumulative start and end positions calculated
         # as if the chromosomes are concatenated from end to end
-        t["xChromStart"] = t[0].map(lambda x: css[x])
-        t["yChromStart"] = t[3].map(lambda x: css[x])
+        t["xChromStart"] = [
+            css[str(x)] for x in t[0].values
+        ]  # .astype("str").map(lambda x: css[str(x)])
+        t["yChromStart"] = [
+            css[str(x)] for x in t[3].values
+        ]  # .astype("str").map(lambda x: css[str(x)])
 
         t["xStart"] = t["xChromStart"] + t[1]
         t["xEnd"] = t["xChromStart"] + t[2]
