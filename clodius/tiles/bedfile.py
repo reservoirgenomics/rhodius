@@ -107,7 +107,9 @@ def ts_hash(filename, chromsizes):
     return f"{filename}.{cs_hash}"
 
 
-def single_indexed_tile(filename, index_filename, chromsizes, tsinfo, z, x, tbx_index):
+def single_indexed_tile(
+    filename, index_filename, chromsizes, tsinfo, z, x, tbx_index, settings
+):
     """Retrieve a single tile from an indexed bedfile."""
     tb = pysam.TabixFile(filename, index=index_filename)
     css = chromsizes.cumsum().shift().fillna(0).to_dict()
@@ -117,7 +119,16 @@ def single_indexed_tile(filename, index_filename, chromsizes, tsinfo, z, x, tbx_
 
     try:
         res = ctt.single_indexed_tile(
-            filename, index_filename, chromsizes, tsinfo, z, x, None, tbx_index, fetcher
+            filename,
+            index_filename,
+            chromsizes,
+            tsinfo,
+            z,
+            x,
+            None,
+            tbx_index,
+            fetcher,
+            max_results=settings.get("MAX_BEDFILE_ENTRIES"),
         )
     except ValueError as err:
         return {"error": str(err)}
@@ -143,9 +154,11 @@ def single_indexed_tile(filename, index_filename, chromsizes, tsinfo, z, x, tbx_
     return formatted
 
 
-def single_tile(filename, chromsizes, tsinfo, z, x):
+def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
     hash_ = ts_hash(filename, chromsizes)
 
+    if settings is None:
+        settings = {}
     # hash the loaded data table so that we don't have to read the entire thing
     # and calculate cumulative start and end positions
     val = cache.get(hash_)
@@ -178,7 +191,7 @@ def single_tile(filename, chromsizes, tsinfo, z, x):
     tileEnd = (x + 1) * tsinfo["max_width"] / 2 ** z
 
     t = t.query(f"xEnd >= {tileStart} & xStart <= {tileEnd}")
-    MAX_PER_TILE = 128
+    MAX_PER_TILE = settings.get("MAX_BEDFILE_ENTRIES") or 1024
 
     t = t.sample(MAX_PER_TILE) if len(t) > MAX_PER_TILE else t
 
@@ -188,8 +201,11 @@ def single_tile(filename, chromsizes, tsinfo, z, x):
     return list(ret.values)
 
 
-def tiles(filename, tile_ids, chromsizes, index_filename):
+def tiles(filename, tile_ids, chromsizes, index_filename, settings=None):
     tsinfo = tileset_info(filename, chromsizes, index_filename)
+
+    if settings is None:
+        settings = {}
 
     tile_values = []
 
@@ -212,7 +228,14 @@ def tiles(filename, tile_ids, chromsizes, index_filename):
 
         if index_filename:
             values = single_indexed_tile(
-                filename, index_filename, chromsizes, tsinfo, z, x, tbx_index=index
+                filename,
+                index_filename,
+                chromsizes,
+                tsinfo,
+                z,
+                x,
+                tbx_index=index,
+                settings=settings,
             )
         else:
             values = single_tile(filename, chromsizes, tsinfo, z, x)
