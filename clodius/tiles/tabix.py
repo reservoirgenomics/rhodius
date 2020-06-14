@@ -144,7 +144,8 @@ def single_indexed_tile(
 
             query_size += est_query_size(tbx_index, chrom, int(start), int(end))
 
-    MAX_QUERY_SIZE = 200000
+    MAX_QUERY_SIZE = 1000000
+    MAX_RESULTS = 2048
 
     if query_size > MAX_QUERY_SIZE:
         return {"error": f"Tile too large {query_size}"}
@@ -156,5 +157,8 @@ def single_indexed_tile(
         chrom = chromsizes.index[cid]
 
         ret_vals += fetcher(str(chrom), int(start), int(end))
+
+    if len(ret_vals) > MAX_RESULTS:
+        return {"error": f"Too many values in tile {len(ret_vals)}"}
 
     return ret_vals
