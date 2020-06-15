@@ -64,8 +64,8 @@ def tileset_info(filename, chromsizes=None, index_filename=None):
     max_width = sum([c[1] for c in chromsizes_list])
 
     if not index_filename:
-        if os.stat(filename).st_size > 10e6:
-            return {"error": "File too large (>10Mb), please index"}
+        if os.stat(filename).st_size > 20e6:
+            return {"error": "File too large (>20Mb), please index"}
 
     return {
         "max_width": max_width,
