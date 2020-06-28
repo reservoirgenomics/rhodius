@@ -278,6 +278,10 @@ def tileset_info(filename):
         "shape": shape,
     }
 
+    if "info" in f:
+        if "category-infos" in f["info"].attrs:
+            tileset_info["category-infos"] = f["info"].attrs["category-infos"]
+
     if "row_infos" in f["resolutions"][str(resolutions[0])].attrs:
         row_infos = f["resolutions"][str(resolutions[0])].attrs["row_infos"]
         if type(row_infos[0]) == str:
