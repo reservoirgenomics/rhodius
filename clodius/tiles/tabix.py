@@ -119,8 +119,11 @@ def single_indexed_tile(
     max_tile_width,
     tbx_index,
     fetcher,
-    max_results=2048,
+    max_results=None,
 ):
+    if max_results is None:
+        max_results = 2048
+
     tile_width = tsinfo["max_width"] / 2 ** z
 
     if max_tile_width and tile_width > max_tile_width:

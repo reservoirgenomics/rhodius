@@ -12,6 +12,8 @@ import clodius.tiles.tabix as ctt
 
 cache = []
 
+import hashlib
+
 
 class LRUCache:
     def __init__(self, capacity):
@@ -142,7 +144,7 @@ def single_indexed_tile(
     for row in res:
         parts = row.split("\t")
         ret = {
-            "uid": slugid.nice(),
+            "uid": hashlib.md5(row.encode("utf-8")).hexdigest(),
             "xStart": css[parts[0]] + int(parts[1]),
             "xEnd": css[parts[0]] + int(parts[2]),
             "chrOffset": css[parts[0]],
