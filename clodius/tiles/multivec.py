@@ -279,8 +279,15 @@ def tileset_info(filename):
     }
 
     if "info" in f:
-        if "category-infos" in f["info"].attrs:
-            tileset_info["category-infos"] = f["info"].attrs["category-infos"]
+        if "category_infos" in f["info"]:
+            try:
+                tileset_info["category_infos"] = json.loads(
+                    f["info"]["category_infos"][()]
+                )
+            except:
+                tileset_info["category_infos"] = json.loads(
+                    f["info"]["category_infos"][()].decode("utf8")
+                )
 
     if "row_infos" in f["resolutions"][str(resolutions[0])].attrs:
         row_infos = f["resolutions"][str(resolutions[0])].attrs["row_infos"]
