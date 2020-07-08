@@ -1,3 +1,12 @@
+v0.15.0
+
+- Improve performance of `clodius aggregate bedpe` using sqlite batch inserts, transactions, and PRAGMAs
+- Show default values for `clodius aggregate bedpe -h`
+- Add short options to `clodius aggregate bedpe`
+- Make `clodius aggregate bedpe --chromosome` actually do something
+- For bedpedb 1D tiles, retrieve entries where either regions at least partially overlaps with a tile
+- Harmonize bedpedb tile getter names
+
 v0.14.3
 
 - Small bug when retrieving tile 0.0 from bam files

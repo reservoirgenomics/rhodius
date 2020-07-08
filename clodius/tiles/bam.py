@@ -43,7 +43,6 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
     # if chromorder is not None...
     # specify the chromosome order for the fetched reads
 
-
     if chromsizes is not None:
         chromsizes_list = []
 
@@ -78,13 +77,10 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
         "m2To": [],
         "mapq": [],
         "tags.HP": [],
-        "strand": []
+        "strand": [],
     }
 
-    strands = {
-        True: '-',
-        False: '+'
-    }
+    strands = {True: "-", False: "+"}
 
     for cid, start, end in abs2genomic(lengths, start_pos, end_pos):
         chr_offset = int(abs_chrom_offsets[cid])
@@ -132,11 +128,11 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
                 results["chrName"] += [read.reference_name]
                 results["chrOffset"] += [chr_offset]
                 results["cigar"] += [read.cigarstring]
-                results['mapq'] += [read.mapq]
+                results["mapq"] += [read.mapq]
 
                 tags = dict(read.tags)
-                results['tags.HP'] += [tags.get('HP', 0)]
-                results['strand'] += [strands[read.is_reverse]]
+                results["tags.HP"] += [tags.get("HP", 0)]
+                results["strand"] += [strands[read.is_reverse]]
             except:
                 raise
 
@@ -207,7 +203,9 @@ def tileset_info(filename, chromsizes):
     return tileset_info
 
 
-def tiles(filename, tile_ids, index_filename=None, chromsizes=None, max_tile_width=None):
+def tiles(
+    filename, tile_ids, index_filename=None, chromsizes=None, max_tile_width=None
+):
     """
     Generate tiles from a bigwig file.
 
@@ -253,7 +251,9 @@ def tiles(filename, tile_ids, index_filename=None, chromsizes=None, max_tile_wid
             start_pos = int(tile_position[1]) * tile_width
             end_pos = start_pos + tile_width
 
-            tile_value = load_reads(samfile, start_pos=start_pos, end_pos=end_pos, chromsizes=chromsizes)
+            tile_value = load_reads(
+                samfile, start_pos=start_pos, end_pos=end_pos, chromsizes=chromsizes
+            )
             generated_tiles += [(tile_id, tile_value)]
 
     return generated_tiles
