@@ -35,7 +35,7 @@ def tiles(filepath, tile_ids):
     if len(tile_ids) == 0:
         return []
 
-    is_1d = len(tile_ids[0].split(".")) < 4
+    is_1d = len(list(tile_ids)[0].split(".")) < 4
 
     if is_1d:
         return tiles_1d(filepath, tile_ids)
