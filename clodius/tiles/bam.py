@@ -145,7 +145,7 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
     return results
 
 
-def tileset_info(filename, chromsizes):
+def alignment_tileset_info(samfile, chromsizes):
     """
     Get the tileset info for a bam file
 
@@ -162,8 +162,6 @@ def tileset_info(filename, chromsizes):
                     'max_zoom': 7
                     }
     """
-    print("filename:", filename)
-
     if chromsizes is not None:
         chromsizes_list = []
 
@@ -172,7 +170,6 @@ def tileset_info(filename, chromsizes):
 
         total_length = sum([c[1] for c in chromsizes_list])
     else:
-        samfile = pysam.AlignmentFile(filename)
         total_length = sum(samfile.lengths)
 
         references = np.array(samfile.references)
@@ -203,8 +200,8 @@ def tileset_info(filename, chromsizes):
     return tileset_info
 
 
-def tiles(
-    filename, tile_ids, index_filename=None, chromsizes=None, max_tile_width=None
+def alignment_tiles(
+    samfile, tile_ids, index_filename=None, chromsizes=None, max_tile_width=None
 ):
     """
     Generate tiles from a bigwig file.
@@ -229,7 +226,6 @@ def tiles(
     """
     generated_tiles = []
     tsinfo = tileset_info(filename, chromsizes)
-    samfile = pysam.AlignmentFile(filename, index_filename=index_filename)
 
     for tile_id in tile_ids:
         tile_id_parts = tile_id.split("|")[0].split(".")
@@ -257,3 +253,15 @@ def tiles(
             generated_tiles += [(tile_id, tile_value)]
 
     return generated_tiles
+
+
+def tileset_info(filename, chromsizes):
+    samfile = pysam.AlignmentFile(filename)
+
+    return alignment_tileset_info(samfile, chromsizes)
+
+
+def tiles(filename, *args):
+    samfile = pysam.AlignmentFile(filename, index_filename=index_filename)
+
+    return alignment_tiles(samfile, *args)
