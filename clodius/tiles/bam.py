@@ -89,6 +89,7 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
             continue
 
         seq_name = f"{chromsizes_list[cid][0]}"
+        print("seq_name", seq_name, start, end)
         reads = samfile.fetch(seq_name, start, end)
 
         for read in reads:
@@ -225,7 +226,7 @@ def alignment_tiles(
         A list of tile_id, tile_data tuples
     """
     generated_tiles = []
-    tsinfo = tileset_info(filename, chromsizes)
+    tsinfo = alignment_tileset_info(samfile, chromsizes)
 
     for tile_id in tile_ids:
         tile_id_parts = tile_id.split("|")[0].split(".")
@@ -261,7 +262,11 @@ def tileset_info(filename, chromsizes):
     return alignment_tileset_info(samfile, chromsizes)
 
 
-def tiles(filename, *args):
+def tiles(
+    filename, tile_ids, index_filename=None, chromsizes=None, max_tile_width=None
+):
     samfile = pysam.AlignmentFile(filename, index_filename=index_filename)
 
-    return alignment_tiles(samfile, *args)
+    return alignment_tiles(
+        samfile, tile_ids, index_filename=None, chromsizes=None, max_tile_width=None
+    )
