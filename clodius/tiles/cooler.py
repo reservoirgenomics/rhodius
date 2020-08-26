@@ -480,7 +480,10 @@ def make_mats(filepath):
     """
     f = h5py.File(filepath, "r")
 
+    print("hello")
+
     if "resolutions" in f:
+        print("a")
         # this file contains raw resolutions so it'll return a different
         # sort of tileset info
         info = {"resolutions": tuple(sorted(map(int, list(f["resolutions"].keys()))))}
