@@ -2,17 +2,15 @@ import functools as ft
 import hashlib
 import math
 import os
-import pandas as pd
 import random
 
+import clodius.tiles.tabix as ctt
+import pandas as pd
 import pysam
 import slugid
 
-import clodius.tiles.tabix as ctt
-
 cache = []
 
-import hashlib
 
 
 class LRUCache:
@@ -170,8 +168,6 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
             filename, header=None, delimiter="\t", compression=get_compression(filename)
         )
 
-        cache.set(hash_, t)
-
         orig_columns = t.columns
         css = chromsizes.cumsum().shift().fillna(0).to_dict()
 
@@ -203,7 +199,10 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
     return list(ret.values)
 
 
-def tiles(filename, tile_ids, chromsizes, index_filename, settings=None):
+def tiles(filename, tile_ids, chromsizes, index_filename, settings=None, single_tile_func=None):
+    if single_tile_func is None:
+        single_tile_func = single_tile
+
     tsinfo = tileset_info(filename, chromsizes, index_filename)
 
     if settings is None:
@@ -240,7 +239,7 @@ def tiles(filename, tile_ids, chromsizes, index_filename, settings=None):
                 settings=settings,
             )
         else:
-            values = single_tile(filename, chromsizes, tsinfo, z, x)
+            values = single_tile_func(filename, chromsizes, tsinfo, z, x)
 
         tile_values += [(tile_id, values)]
 
