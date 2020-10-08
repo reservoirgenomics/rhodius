@@ -14,3 +14,4 @@ wget -q -NP data/ https://s3.amazonaws.com/pkerp/public/SRR1770413.sorted.short.
 wget -q -NP data/ https://s3.amazonaws.com/pkerp/public/SRR1770413.mismatched_bai.bam
 wget -q -NP data/ https://s3.amazonaws.com/pkerp/public/geneAnnotationsExonUnions.1000.bed.v3.beddb
 wget -q -NP data/ https://s3.amazonaws.com/areynolds/public/masterlist_DHSs_733samples_WM20180608_all_mean_signal_colorsMax.bed.bb
+wget -q -NP data/ ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/bacteria/Escherichia_sp._ESNIH1/latest_assembly_versions/GCA_002918705.1_ASM291870v1/GCA_002918705.1_ASM291870v1_genomic.gff.gz
