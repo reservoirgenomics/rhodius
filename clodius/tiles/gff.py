@@ -50,7 +50,6 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
     # hash the loaded data table so that we don't have to read the entire thing
     # and calculate cumulative start and end positions
     val = ctb.cache.get(hash_)
-    print("hey")
 
     if val is None:
         t = pd.read_csv(
