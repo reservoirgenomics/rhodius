@@ -22,7 +22,7 @@ def row_to_bedlike(row, css, orig_columns):
         "xEnd": row["xEnd"],
         "chrOffset": css[row[0]],
         "importance": random.random(),
-        "fields": [row[0], row[3], row[4], attrs['Name']],
+        "fields": [row[0], row[3], row[4], attrs['Name'], '-', row[6]],
     }
 
     return ret
