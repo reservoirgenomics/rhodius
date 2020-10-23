@@ -26,6 +26,11 @@ FILETYPES = {
         "extensions": [".hitile"],
         "datatypes": ["vector"],
     },
+    "multivec": {
+        "description": "Multi-sample vector file",
+        "extensions": [".multivec"],
+        "datatypes": ["multivec"],
+    },
     "time-interval-json": {
         "description": "Time interval notation",
         "extensions": [".htime"],

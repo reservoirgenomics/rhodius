@@ -1,7 +1,9 @@
 import math
+
 import numpy as np
-import pysam
+
 import clodius.tiles.bigwig as ctbw
+import pysam
 
 
 def abs2genomic(chromsizes, start_pos, end_pos):
@@ -256,7 +258,7 @@ def alignment_tiles(
     return generated_tiles
 
 
-def tileset_info(filename, chromsizes):
+def tileset_info(filename, chromsizes=None):
     samfile = pysam.AlignmentFile(filename)
 
     return alignment_tileset_info(samfile, chromsizes)

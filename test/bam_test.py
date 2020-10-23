@@ -1,10 +1,10 @@
 from __future__ import print_function
 
 import json
-
-import clodius.tiles.bam as ctb
 import os.path as op
 import unittest
+
+import clodius.tiles.bam as ctb
 
 
 class MyTestCase(unittest.TestCase):
@@ -53,4 +53,4 @@ class MyTestCase(unittest.TestCase):
             max_tile_width=10,
         )
 
-        assert "error" in tile[0][1]
+        assert "error" not in tile[0][1]

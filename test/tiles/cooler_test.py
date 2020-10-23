@@ -1,7 +1,9 @@
-import clodius.tiles.cooler as hgco
-import numpy as np
-import os.path as op
 import base64
+import os.path as op
+
+import numpy as np
+
+import clodius.tiles.cooler as hgco
 
 
 def test_cooler_info():
@@ -19,8 +21,3 @@ def test_cooler_info():
 
     filename = op.join("data", "hic-resolutions.cool")
     # print(hgco.tileset_info(filename))
-
-
-def test_cooler_tiles():
-    filename = op.join("data", "hic-resolutions.cool")
-    hgco.tiles(filename, ["x.0.0.0"])
