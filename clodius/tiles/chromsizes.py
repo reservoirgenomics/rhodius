@@ -3,6 +3,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def tileset_info(filename):
+    chromsizes = get_tsv_chromsizes(filename)
+
+    return {
+        "max_width": sum([int(c[1]) for c in chromsizes]),
+        "chromsizes": [[c[0], int(c[1])] for c in chromsizes]
+    }
 
 def get_tsv_chromsizes(filename):
     """
