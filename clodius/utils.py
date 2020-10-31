@@ -1,6 +1,11 @@
 import os.path as op
 
 FILETYPES = {
+    "bam": {
+        "description": "Read mappings",
+        "extensions": [".bam"],
+        "datatypes": ["reads", "alignments"]
+    },
     "cooler": {
         "description": "multi-resolution cooler file",
         "extensions": [".mcool"],
@@ -11,6 +16,11 @@ FILETYPES = {
         "extensions": [".bw", ".bigwig"],
         "datatypes": ["vector"],
     },
+    "bedfile": {
+        "description": "BED file",
+        "extensions": [".bed", ".bed.gz", ".bed.bgz"],
+        "datatypes": ["bedlike", "gene-annotations"],
+    },
     "beddb": {
         "description": "SQLite-based multi-resolution annotation file",
         "extensions": [".beddb", ".multires.db"],
@@ -18,7 +28,7 @@ FILETYPES = {
     },
     "gff": {
         "description": "General feature format",
-        "extensions": [".gff", ".gff.gz"],
+        "extensions": [".gff", ".gff.gz", ".gff.bgz"],
         "datatypes": ["bedlike"],
     },
     "hitile": {
