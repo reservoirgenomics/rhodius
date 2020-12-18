@@ -2,12 +2,12 @@ import collections as col
 import itertools as it
 import logging
 
+import cooler
 import h5py
 import numpy as np
 
 import clodius.tiles.format as hgfo
 import clodius.tiles.utils as hgut
-import cooler
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -483,7 +483,6 @@ def make_mats(filepath):
     f = h5py.File(filepath, "r")
 
     if "resolutions" in f:
-        print("a")
         # this file contains raw resolutions so it'll return a different
         # sort of tileset info
         info = {"resolutions": tuple(sorted(map(int, list(f["resolutions"].keys()))))}

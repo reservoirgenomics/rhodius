@@ -1,9 +1,10 @@
 import collections as col
 import gzip
 import math
-import numpy as np
 import random
 import struct
+
+import numpy as np
 
 from clodius.tiles.bigwig import abs2genomic
 
@@ -154,6 +155,7 @@ def single_indexed_tile(
         return {"error": f"Tile too large {query_size}"}
 
     for (cid, start, end) in cids_starts_ends:
+        print('cid', cid)
         if cid >= len(chromsizes):
             continue
 
