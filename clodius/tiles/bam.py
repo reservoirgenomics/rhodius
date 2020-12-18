@@ -80,6 +80,7 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
         "mapq": [],
         "tags.HP": [],
         "strand": [],
+        'variants': []
     }
 
     strands = {True: "-", False: "+"}
@@ -132,7 +133,7 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
                 results["chrOffset"] += [chr_offset]
                 results["cigar"] += [read.cigarstring]
                 results["mapq"] += [read.mapq]
-
+                results['variants'] += [[r for r in read.get_aligned_pairs(with_seq=True) if r[2] is not None and r[2].islower()]]
                 tags = dict(read.tags)
                 results["tags.HP"] += [tags.get("HP", 0)]
                 results["strand"] += [strands[read.is_reverse]]
