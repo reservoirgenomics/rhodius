@@ -26,6 +26,11 @@ FILETYPES = {
         "extensions": [".beddb", ".multires.db"],
         "datatypes": ["bedlike", "gene-annotations"],
     },
+    "fasta": {
+        "description": 'FASTA sequence file',
+        "extensions": ['.fa', '.fna'],
+        "datatypes": ['sequence'],
+    },
     "gff": {
         "description": "General feature format",
         "extensions": [".gff", ".gff.gz", ".gff.bgz"],
