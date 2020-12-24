@@ -1,10 +1,11 @@
 import os.path as op
+from pydantic import BaseModel
 
 FILETYPES = {
     "bam": {
         "description": "Read mappings",
         "extensions": [".bam"],
-        "datatypes": ["reads", "alignments"]
+        "datatypes": ["reads", "alignments"],
     },
     "cooler": {
         "description": "multi-resolution cooler file",
@@ -27,9 +28,9 @@ FILETYPES = {
         "datatypes": ["bedlike", "gene-annotations"],
     },
     "fasta": {
-        "description": 'FASTA sequence file',
-        "extensions": ['.fa', '.fna'],
-        "datatypes": ['sequence'],
+        "description": "FASTA sequence file",
+        "extensions": [".fa", ".fna"],
+        "datatypes": ["sequence"],
     },
     "gff": {
         "description": "General feature format",
@@ -56,7 +57,7 @@ FILETYPES = {
 
 def infer_filetype(filename):
     for filetype, meta in FILETYPES.items():
-        for ext in meta['extensions']:
+        for ext in meta["extensions"]:
             if filename.endswith(ext):
                 return filetype
 

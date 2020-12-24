@@ -1,5 +1,8 @@
 import os.path as op
 
+from pydantic import BaseModel, validator
+from typing import Optional, List
+
 
 def partition_by_adjacent_tiles(tile_ids, dimension=2):
     """
@@ -180,3 +183,47 @@ def tile_bounds(tsinfo, z, x, y, width=1, height=1):
     to_y = min_pos[1] + (y + height) * tile_width
 
     return [from_x, from_y, to_x, to_y]
+
+
+class TilesetInfo(BaseModel):
+    max_zoom: int
+    max_width: int
+    max_pos: List[int]
+    min_pos: List[int]
+
+    @validator("max_zoom")
+    def max_zoom_zero_or_greater(cls, v):
+        """Check to make sure the zoom level is 0 or greater."""
+        if v < 0:
+            raise ValueError("The zoom level must be greater than or equal to 0")
+        return int(v)
+
+    @validator("max_width")
+    def max_width_greater_than_zero(cls, v):
+        """Check to make sure the max_width is greater than 0"""
+        if v <= 0:
+            raise ValueError("The max_width must be greater than 0")
+        return int(v)
+
+
+class TileInfo(BaseModel):
+    zoom: int
+    position: List[int]
+    width: Optional[int]
+
+    @validator("zoom")
+    def zoom_zero_or_greater(cls, v):
+        """Check to make sure the zoom level is 0 or greater."""
+        if v < 0:
+            raise ValueError("The zoom level must be greater than 0")
+        return int(v)
+
+
+def parse_tile_id(tile_id, tsinfo):
+    tile_id_parts = tile_id.split("|")[0].split(".")
+    tile_position = list(map(int, tile_id_parts[1:3]))
+    zoom_level = int(tile_id_parts[1])
+
+    tile_width = tsinfo.max_width / 2 ** int(tile_position[0])
+
+    return TileInfo(zoom=zoom_level, position=tile_position[1:], width=tile_width)
