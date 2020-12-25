@@ -5,19 +5,8 @@ import numpy as np
 import clodius.tiles.bigwig as ctbw
 import pysam
 
+from clodius.tiles.utils import abs2genomic
 
-def abs2genomic(chromsizes, start_pos, end_pos):
-    abs_chrom_offsets = np.r_[0, np.cumsum(chromsizes)]
-    cid_lo, cid_hi = (
-        np.searchsorted(abs_chrom_offsets, [start_pos, end_pos], side="right") - 1
-    )
-    rel_pos_lo = start_pos - abs_chrom_offsets[cid_lo]
-    rel_pos_hi = end_pos - abs_chrom_offsets[cid_hi]
-    start = rel_pos_lo
-    for cid in range(cid_lo, cid_hi):
-        yield cid, start, chromsizes[cid]
-        start = 0
-    yield cid_hi, start, rel_pos_hi
 
 def get_cigar_substitutions(read):
     subs = []
@@ -26,37 +15,38 @@ def get_cigar_substitutions(read):
     cigartuples = read.cigartuples
     readstart = read.pos
     readend = read.pos + read.query_length
-    
+
     for ctuple in cigartuples:
         if ctuple[0] == pysam.CDIFF:
-            subs.append((readstart + curr_pos, 'X', ctuple[1]))
+            subs.append((readstart + curr_pos, "X", ctuple[1]))
             curr_pos += ctuple[1]
         elif ctuple[0] == pysam.CINS:
-            subs.append((readstart + curr_pos, 'I', ctuple[1]))
+            subs.append((readstart + curr_pos, "I", ctuple[1]))
         elif ctuple[0] == pysam.CDEL:
-            subs.append((readstart + curr_pos, 'D', ctuple[1]))
+            subs.append((readstart + curr_pos, "D", ctuple[1]))
             curr_pos += ctuple[1]
         elif ctuple[0] == pysam.CREF_SKIP:
-            subs.append((readstart + curr_pos, 'N', ctuple[1]))
+            subs.append((readstart + curr_pos, "N", ctuple[1]))
             curr_pos += ctuple[1]
         elif ctuple[0] == pysam.CEQUAL or ctuple[0] == pysam.CMATCH:
             curr_pos += ctuple[1]
-    
+
     if len(cigartuples):
         first_ctuple = cigartuples[0]
         last_ctuple = cigartuples[-1]
-        
+
         if first_ctuple[0] == pysam.CSOFT_CLIP:
-            subs.append((readstart-first_ctuple[1], 'S', first_ctuple[1]))
+            subs.append((readstart - first_ctuple[1], "S", first_ctuple[1]))
         if first_ctuple[0] == pysam.CHARD_CLIP:
-            subs.append((readstart-first_ctuple[1], 'H', first_ctuple[1])) 
+            subs.append((readstart - first_ctuple[1], "H", first_ctuple[1]))
 
         if last_ctuple[0] == pysam.CSOFT_CLIP:
-            subs.append((readend - last_ctuple[1], 'S', last_ctuple[1]))
+            subs.append((readend - last_ctuple[1], "S", last_ctuple[1]))
         if last_ctuple[0] == pysam.CHARD_CLIP:
-            subs.append((readend, 'H', last_ctuple[1])) 
+            subs.append((readend, "H", last_ctuple[1]))
 
     return subs
+
 
 def load_reads(samfile, start_pos, end_pos, chromsizes=None):
     """
@@ -118,8 +108,8 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
         "mapq": [],
         "tags.HP": [],
         "strand": [],
-        'variants': [],
-        'cigars': []
+        "variants": [],
+        "cigars": [],
     }
 
     strands = {True: "-", False: "+"}
@@ -171,10 +161,14 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
                 results["chrOffset"] += [chr_offset]
                 results["cigar"] += [read.cigarstring]
                 results["mapq"] += [read.mapq]
-                results['variants'] += [
-                        [(r[0], r[1], read.query_sequence[r[0]]) for r in read.get_aligned_pairs(with_seq=True) if r[2] is not None and r[2].islower()]
+                results["variants"] += [
+                    [
+                        (r[0], r[1], read.query_sequence[r[0]])
+                        for r in read.get_aligned_pairs(with_seq=True)
+                        if r[2] is not None and r[2].islower()
                     ]
-                results['cigars'] += [get_cigar_substitutions(read)]
+                ]
+                results["cigars"] += [get_cigar_substitutions(read)]
                 tags = dict(read.tags)
                 results["tags.HP"] += [tags.get("HP", 0)]
                 results["strand"] += [strands[read.is_reverse]]

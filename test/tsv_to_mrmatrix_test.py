@@ -1,13 +1,14 @@
-import unittest
-from tempfile import TemporaryDirectory
 import csv
+import unittest
 from math import nan
+from tempfile import TemporaryDirectory
 
+import h5py
 import numpy as np
 from numpy.testing import assert_array_equal
-import h5py
 
 from scripts.tsv_to_mrmatrix import coarsen, parse
+
 
 class CoarsenTest(unittest.TestCase):
     def test_5_layer_pyramid(self):
@@ -124,12 +125,16 @@ class ParseTest(unittest.TestCase):
             parse(csv_handle, hdf5_write_handle)
 
             hdf5 = h5py.File(hdf5_path, 'r')
-            self.assertEqual(list(hdf5.keys()), ['labels', 'resolutions'])
-            self.assertEqual(list(hdf5['labels']), labels[1:])
 
-            self.assertEqual(list(hdf5['resolutions'].keys()), ['1', '2'])
+            def decode_if_possible(keys):
+                return [x.decode() if hasattr(x, 'decode') else x for x in keys]
 
-            self.assertEqual(list(hdf5['resolutions']['1'].keys()), ['nan_values', 'values'])
+            self.assertEqual(decode_if_possible(list(hdf5.keys())), ['labels', 'resolutions'])
+            self.assertEqual(decode_if_possible(list(hdf5['labels'])), labels[1:])
+
+            self.assertEqual(decode_if_possible(list(hdf5['resolutions'].keys())), ['1', '2'])
+
+            self.assertEqual(decode_if_possible(list(hdf5['resolutions']['1'].keys())), ['nan_values', 'values'])
             assert_array_equal(
                 hdf5['resolutions']['1']['nan_values'], [[0] * 512] * 512
             )
@@ -139,7 +144,7 @@ class ParseTest(unittest.TestCase):
             assert_array_equal(res_1[6], [1, -1] * 256)
             assert_array_equal(res_1[9], [nan] * 512)
 
-            self.assertEqual(list(hdf5['resolutions']['2'].keys()), ['values'])
+            self.assertEqual(decode_if_possible(list(hdf5['resolutions']['2'].keys())), ['values'])
             res_2 = hdf5['resolutions']['2']['values']
             assert_array_equal(res_2[0], [0] * 256)
             assert_array_equal(res_2[1], [2] * 256) # Stradles the 0 and 1 rows
