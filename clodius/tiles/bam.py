@@ -4,7 +4,6 @@ import numpy as np
 
 import clodius.tiles.bigwig as ctbw
 import pysam
-
 from clodius.tiles.utils import abs2genomic
 
 
@@ -122,7 +121,7 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
 
         seq_name = f"{chromsizes_list[cid][0]}"
         reads = samfile.fetch(seq_name, start, end)
-
+        print(seq_name, start, end)
         for read in reads:
             if read.is_unmapped:
                 continue
@@ -161,13 +160,16 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
                 results["chrOffset"] += [chr_offset]
                 results["cigar"] += [read.cigarstring]
                 results["mapq"] += [read.mapq]
-                results["variants"] += [
-                    [
-                        (r[0], r[1], read.query_sequence[r[0]])
-                        for r in read.get_aligned_pairs(with_seq=True)
-                        if r[2] is not None and r[2].islower()
+                if read.query_sequence:
+                    results["variants"] += [
+                        [
+                            (r[0], r[1], read.query_sequence[r[0]])
+                            for r in read.get_aligned_pairs(with_seq=True)
+                            if r[2] is not None and r[2].islower()
+                        ]
                     ]
-                ]
+                else:
+                    results["variants"] += []
                 results["cigars"] += [get_cigar_substitutions(read)]
                 tags = dict(read.tags)
                 results["tags.HP"] += [tags.get("HP", 0)]
