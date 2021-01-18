@@ -15,3 +15,6 @@ wget -q -NP data/ https://s3.amazonaws.com/pkerp/public/geneAnnotationsExonUnion
 wget -q -NP data/ https://s3.amazonaws.com/areynolds/public/masterlist_DHSs_733samples_WM20180608_all_mean_signal_colorsMax.bed.bb
 wget -q -NP data/ ftp://ftp.ncbi.nlm.nih.gov/genomes/genbank/bacteria/Escherichia_sp._ESNIH1/latest_assembly_versions/GCA_002918705.1_ASM291870v1/GCA_002918705.1_ASM291870v1_genomic.gff.gz
 wget -q -NP data/ https://s3.amazonaws.com/pkerp/public/hg38.chrom.sizes
+wget -q -NP data/ https://s3.amazonaws.com/pkerp/public/regions.valid.bed
+wget -q -NP data/ https://s3.amazonaws.com/pkerp/public/regions.spaces.bed
+wget -q -NP data/ https://s3.amazonaws.com/pkerp/public/chm13v1.chrom.sizes

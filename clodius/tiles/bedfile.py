@@ -4,8 +4,9 @@ import math
 import os
 import random
 
-import clodius.tiles.tabix as ctt
 import pandas as pd
+
+import clodius.tiles.tabix as ctt
 import pysam
 import slugid
 
@@ -155,6 +156,13 @@ def single_indexed_tile(
 
 
 def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
+    """
+    Available settings:
+
+    {
+        MAX_BEDFILE_ENTRIES: int
+    }
+    """
     hash_ = ts_hash(filename, chromsizes)
 
     if settings is None:
@@ -173,7 +181,10 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
 
         # xStart and xEnd are cumulative start and end positions calculated
         # as if the chromosomes are concatenated from end to end
-        t["chromStart"] = t[0].map(lambda x: css[x])
+        try:
+            t["chromStart"] = t[0].map(lambda x: css[x])
+        except KeyError as ke:
+            return {"error": f"Key error: (bedfile tab separated? correct chromsizes?) {str(ke)}"}
         t["xStart"] = t["chromStart"] + t[1]
         t["xEnd"] = t["chromStart"] + t[2]
         t["ix"] = t.index
