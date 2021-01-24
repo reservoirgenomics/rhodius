@@ -1,12 +1,76 @@
+import itertools
 import math
-import pandas as pd
 import random
 
-import clodius.tiles.tabix as rtt
+import pandas as pd
 
+import clodius.tiles.tabix as rtt
+from clodius.tiles.bigwig import abs2genomic
 from pysam import VariantFile
 
-from clodius.tiles.bigwig import abs2genomic
+
+def grouper(n, iterable):
+    it = iter(iterable)
+    while True:
+        chunk = tuple(itertools.islice(it, n))
+        if not chunk:
+            return
+        yield chunk
+
+def generic_regions(fetcher,offset, limit):
+    if offset:
+        for i in range(offset):
+            try:
+                next(fetcher)
+            except StopIteration:
+                return {
+                    "offset": offset,
+                    "limit": limit,
+                    "results": [],
+                    "next": False
+                }
+
+
+    curr_page = next(grouper(limit, fetcher))
+
+    try:
+        # see if there's another page of results
+        next_page = next(grouper(limit, fetcher))
+        next_page = True
+    except StopIteration:
+        next_page = false
+
+    ret = curr_page
+
+    return (ret, next_page)
+
+def regions(filename, chromsizes, offset, limit):
+    """Return a list of regions in the range.
+
+    Arguments:
+        filename: The name of the file
+        chromsizes: A dictionary containing the offsets of each chromosome
+            from the start of the genome
+        offset: The offset from the beginning of the file from which to start
+            fetching entries
+        limit: The total number of entries to fetch
+    """
+    vcf = VariantFile(filename)  # auto-detect input format
+
+    fetcher = vcf.fetch()
+    css = chromsizes.cumsum().shift().fillna(0).to_dict()
+
+    def regions_iterator():
+        for rec in fetcher:
+            yield {
+                "uid": rec.id,
+                "chrOffset": css[rec.chrom],
+                "xStart": css[rec.chrom] + rec.start,
+                "xEnd": css[rec.chrom] + rec.stop,
+                "fields": (rec.chrom, rec.start, rec.stop, str(rec)),
+            }
+
+    return generic_regions(regions_iterator(), offset, limit)
 
 
 def tileset_info(filename, chromsizes):

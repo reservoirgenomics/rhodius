@@ -19,3 +19,11 @@ def test_bed_tiles():
 
 	print('tiles:', tiles)
 	assert 'error' in tiles[0][1]
+
+def test_bed_regions():
+	valid_filename = op.join('data', 'regions.valid.bed')
+	chromsizes_fn = op.join('data', 'chm13v1.chrom.sizes')
+	chromsizes = cc.chromsizes_as_series(chromsizes_fn)
+
+	regions = ctb.regions(valid_filename, chromsizes, 0, 10)
+	assert len(regions[0]) == 10

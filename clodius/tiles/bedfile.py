@@ -5,14 +5,14 @@ import os
 import random
 
 import pandas as pd
+from pydantic import BaseModel
 
 import clodius.tiles.tabix as ctt
 import pysam
 import slugid
+from clodius.tiles.vcf import generic_regions
 
 cache = []
-
-
 
 class LRUCache:
     def __init__(self, capacity):
@@ -154,22 +154,16 @@ def single_indexed_tile(
 
     return formatted
 
+def get_bedfile_values(filename, chromsizes):
+    """Return a processed bedfile containing a dataframe and
+    and some other information."""
 
-def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
-    """
-    Available settings:
-
-    {
-        MAX_BEDFILE_ENTRIES: int
-    }
-    """
     hash_ = ts_hash(filename, chromsizes)
 
-    if settings is None:
-        settings = {}
     # hash the loaded data table so that we don't have to read the entire thing
     # and calculate cumulative start and end positions
     val = cache.get(hash_)
+
 
     if val is None:
         t = pd.read_csv(
@@ -181,16 +175,32 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
 
         # xStart and xEnd are cumulative start and end positions calculated
         # as if the chromosomes are concatenated from end to end
-        try:
-            t["chromStart"] = t[0].map(lambda x: css[x])
-        except KeyError as ke:
-            return {"error": f"Key error: (bedfile tab separated? correct chromsizes?) {str(ke)}"}
+        t["chromStart"] = t[0].map(lambda x: css[x])
+
         t["xStart"] = t["chromStart"] + t[1]
         t["xEnd"] = t["chromStart"] + t[2]
         t["ix"] = t.index
 
         val = {"rows": t, "orig_columns": orig_columns, "css": css}
         cache.set(hash_, val)
+
+    return val
+
+def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
+    """
+    Available settings:
+
+    {
+        MAX_BEDFILE_ENTRIES: int
+    }
+    """
+    if settings is None:
+        settings = {}
+
+    try:
+        val = get_bedfile_values(filename, chromsizes)
+    except KeyError as ke:
+        return {"error": f"Key error: (bedfile tab separated? correct chromsizes?) {str(ke)}"}
 
     t = val["rows"]
     orig_columns = val["orig_columns"]
@@ -255,3 +265,35 @@ def tiles(filename, tile_ids, chromsizes, index_filename, settings=None, single_
         tile_values += [(tile_id, values)]
 
     return tile_values
+
+
+class BedfileEntry(BaseModel):
+    chrom: str
+    start: int
+    end: int
+
+
+def regions(filename, chromsizes, offset, limit):
+    """Return a list of regions in the range.
+
+    Arguments:
+        filename: The name of the file
+        chromsizes: A dictionary containing the offsets of each chromosome
+            from the start of the genome
+        offset: The offset from the beginning of the file from which to start
+            fetching entries
+        limit: The total number of entries to fetch
+    """
+    vals = get_bedfile_values(filename, chromsizes)
+
+    def row_iterator():
+        for ix,row in vals['rows'].iterrows():
+            yield {
+                "uid": row['ix'],
+                "chrOffset": row['chromStart'],
+                "xStart": row['xStart'],
+                'xEnd': row['xEnd'],
+                'fields': list(row[vals['orig_columns']].array)
+            }
+
+    return generic_regions(row_iterator(), offset, limit)
