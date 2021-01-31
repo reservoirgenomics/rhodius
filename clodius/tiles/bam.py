@@ -161,13 +161,17 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
                 results["cigar"] += [read.cigarstring]
                 results["mapq"] += [read.mapq]
                 if read.query_sequence:
-                    results["variants"] += [
-                        [
+                    try:
+                        variants = [
                             (r[0], r[1], read.query_sequence[r[0]])
                             for r in read.get_aligned_pairs(with_seq=True)
                             if r[2] is not None and r[2].islower()
                         ]
-                    ]
+                    except ValueError:
+                        # Probably MD tag not present
+                        variants = []
+
+                    results["variants"] += [variants]
                 else:
                     results["variants"] += []
                 results["cigars"] += [get_cigar_substitutions(read)]
