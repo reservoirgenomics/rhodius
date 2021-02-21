@@ -1,13 +1,14 @@
 from __future__ import print_function
 
 import gzip
-import h5py
-import math
-import numpy as np
 import logging
+import math
 import os
 import os.path as op
 import sys
+
+import h5py
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -193,8 +194,12 @@ def create_multivec_multires(
     chrom_array = np.array(chroms, dtype="S")
 
     # row_infos = None
-    if "row_infos" in array_data.attrs:
-        row_infos = array_data.attrs["row_infos"]
+    try:
+        if "row_infos" in array_data.attrs:
+            row_infos = array_data.attrs["row_infos"]
+    except AttributeError:
+        # array data probably isn't an HDF5 file
+        pass
 
     # add the chromosome information
     if row_infos is not None:

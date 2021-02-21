@@ -121,7 +121,6 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
 
         seq_name = f"{chromsizes_list[cid][0]}"
         reads = samfile.fetch(seq_name, start, end)
-        print(seq_name, start, end)
         for read in reads:
             if read.is_unmapped:
                 continue

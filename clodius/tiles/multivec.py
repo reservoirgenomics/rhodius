@@ -1,6 +1,6 @@
-import math
 import base64
 import json
+import math
 
 import h5py
 import numpy as np
@@ -42,6 +42,10 @@ def tiles(filename, tile_ids):
         A list of tile_ids (e.g. xyx.0.0) identifying the tiles
         to be retrieved
     """
+    import time
+
+    t1 = time.time()
+    # print("getting tiles", tile_ids)
     f16 = np.finfo("float16")
     f16_min, f16_max = f16.min, f16.max
     generated_tiles = []
@@ -60,6 +64,7 @@ def tiles(filename, tile_ids):
             "shape": ma.shape,
         }
         generated_tiles.append((tile_id, tile_value))
+        t4 = time.time()
 
     return generated_tiles
 
@@ -137,7 +142,7 @@ def get_tile(f, chromsizes, resolution, start_pos, end_pos, shape):
         the values for the portion of the genome that is visible.
     """
     binsize = resolution
-    # print('binsize:', binsize)
+    # print("binsize:", binsize)
     # print('start_pos:', start_pos, 'end_pos:', end_pos)
     # print("length:", end_pos - start_pos)
     # print('shape:', shape)
@@ -156,7 +161,7 @@ def get_tile(f, chromsizes, resolution, start_pos, end_pos, shape):
     for cid, start, end in abs2genomic([c[1] for c in chromsizes], start_pos, end_pos):
         n_bins = int(np.ceil((end - start) / binsize))
         total_length += end - start
-        # print('cid', cid, start, end, 'tl:', total_length)
+        # print("cid", cid, start, end, "tl:", total_length)
 
         try:
             # t1 = time.time()
@@ -191,7 +196,7 @@ def get_tile(f, chromsizes, resolution, start_pos, end_pos, shape):
                     continue
             """
 
-            # print("offset:", offset, "start_pos", start_pos, end_pos)
+            # print("start_pos", start_pos, end_pos)
             x = f["resolutions"][str(resolution)]["values"][chrom][start_pos:end_pos]
             current_binned_data_position += binsize * (end_pos - start_pos)
 
@@ -311,7 +316,6 @@ def tileset_info(filename):
                 ]
             except json.JSONDecodeError:
                 tileset_info["row_infos"] = [r.decode("utf8") for r in row_infos]
-
 
     f.close()
 
