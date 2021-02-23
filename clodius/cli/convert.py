@@ -447,7 +447,7 @@ def reads_to_array(f_in, h_out, ref, chrom_len):
 
     """
     logger.info("Creating array for chrom: %s with length: %d", ref, chrom_len)
-    reads = list(f_in.fetch(ref, 0, chrom_len))
+    reads = f_in.fetch(ref, 0, chrom_len)
 
     subs = {
         "A": np.zeros((chrom_len,)),
@@ -531,6 +531,8 @@ def bamfile_to_multivec(filepath, index_filepath, output_file):
     from clodius.tiles.bam import get_cigar_substitutions
 
     f = pysam.AlignmentFile(filepath, index_filename=index_filepath)
+
+    logger.info("Loaded alignment file")
 
     with TemporaryDirectory() as tmp_dir:
         h_mid = h5py.File(op.join(tmp_dir, "mid.h5"), "w")

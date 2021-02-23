@@ -1,11 +1,12 @@
-import clodius.chromosomes as cs
-import clodius.tiles.bedpe as ctbp
 import os.path as op
-
-testdir = op.realpath(op.dirname(__file__))
 
 import numpy as np
 import pytest
+
+import clodius.chromosomes as cs
+import clodius.tiles.bedpe as ctbp
+
+testdir = op.realpath(op.dirname(__file__))
 
 
 @pytest.mark.parametrize(
@@ -29,7 +30,9 @@ def test_bedpe_tileset_info(filename, header):
     assert tileset_info["header"] == header
 
 
-@pytest.mark.parametrize("filename", [("hg19_myc.bedpe")])
+@pytest.mark.parametrize(
+    "filename", [("hg19_myc.bedpe"), "hg19_myc.1.bedpe.gz",],
+)
 def test_bedpe_tiles(filename):
     input_file = op.join(testdir, "sample_data", filename)
     chromsizes_fn = op.join(testdir, "sample_data", "b37.chrom.sizes")

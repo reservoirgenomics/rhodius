@@ -2,13 +2,13 @@ import functools as ft
 import hashlib
 import math
 import os
-import pandas as pd
 import random
 
-import pysam
-import slugid
+import pandas as pd
 
 import clodius.tiles.tabix as ctt
+import pysam
+import slugid
 
 cache = []
 
@@ -41,6 +41,20 @@ class LRUCache:
 cache = LRUCache(1)
 
 
+def get_compression(filename):
+    """Check whether a file is gzipped."""
+
+    if (
+        filename.endswith(".gz..")
+        or filename.endswith(".gz")
+        or filename.endswith(".bgz")
+        or filename.endswith(".bgz..")
+    ):
+        return "gzip"
+    else:
+        return None
+
+
 def tileset_info(filename, chromsizes=None):
     """
 
@@ -55,9 +69,22 @@ def tileset_info(filename, chromsizes=None):
     # do this so that we can serialize the int64s in the numpy array
     chromsizes_list = []
 
-    t = pd.read_csv(filename, nrows=2, sep="\t", comment="#", header=None)
+    t = pd.read_csv(
+        filename,
+        nrows=2,
+        sep="\t",
+        comment="#",
+        header=None,
+        compression=get_compression(filename),
+    )
     t_head = pd.read_csv(
-        filename, nrows=2, sep="\t", comment="#", header=None, skiprows=1
+        filename,
+        nrows=2,
+        sep="\t",
+        comment="#",
+        header=None,
+        skiprows=1,
+        compression=get_compression(filename),
     )
 
     if (t.dtypes == t_head.dtypes).all():

@@ -14,6 +14,7 @@ from clodius.tiles.vcf import generic_regions
 
 cache = []
 
+
 class LRUCache:
     def __init__(self, capacity):
         self.capacity = capacity
@@ -65,7 +66,9 @@ def tileset_info(filename, chromsizes=None, index_filename=None):
     max_width = sum([c[1] for c in chromsizes_list])
 
     if not index_filename:
-        if os.stat(filename).st_size > 20e6:
+        filesize = os.stat(filename).st_size
+
+        if filesize > 20e6:
             return {"error": "File too large (>20Mb), please index"}
 
     return {
@@ -154,6 +157,7 @@ def single_indexed_tile(
 
     return formatted
 
+
 def get_bedfile_values(filename, chromsizes):
     """Return a processed bedfile containing a dataframe and
     and some other information."""
@@ -163,7 +167,6 @@ def get_bedfile_values(filename, chromsizes):
     # hash the loaded data table so that we don't have to read the entire thing
     # and calculate cumulative start and end positions
     val = cache.get(hash_)
-
 
     if val is None:
         t = pd.read_csv(
@@ -186,6 +189,7 @@ def get_bedfile_values(filename, chromsizes):
 
     return val
 
+
 def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
     """
     Available settings:
@@ -200,7 +204,9 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
     try:
         val = get_bedfile_values(filename, chromsizes)
     except KeyError as ke:
-        return {"error": f"Key error: (bedfile tab separated? correct chromsizes?) {str(ke)}"}
+        return {
+            "error": f"Key error: (bedfile tab separated? correct chromsizes?) {str(ke)}"
+        }
 
     t = val["rows"]
     orig_columns = val["orig_columns"]
@@ -220,7 +226,9 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
     return list(ret.values)
 
 
-def tiles(filename, tile_ids, chromsizes, index_filename, settings=None, single_tile_func=None):
+def tiles(
+    filename, tile_ids, chromsizes, index_filename, settings=None, single_tile_func=None
+):
     if single_tile_func is None:
         single_tile_func = single_tile
 
@@ -287,13 +295,13 @@ def regions(filename, chromsizes, offset, limit):
     vals = get_bedfile_values(filename, chromsizes)
 
     def row_iterator():
-        for ix,row in vals['rows'].iterrows():
+        for ix, row in vals["rows"].iterrows():
             yield {
-                "uid": row['ix'],
-                "chrOffset": row['chromStart'],
-                "xStart": row['xStart'],
-                'xEnd': row['xEnd'],
-                'fields': list(row[vals['orig_columns']].array)
+                "uid": row["ix"],
+                "chrOffset": row["chromStart"],
+                "xStart": row["xStart"],
+                "xEnd": row["xEnd"],
+                "fields": list(row[vals["orig_columns"]].array),
             }
 
     return generic_regions(row_iterator(), offset, limit)
