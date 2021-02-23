@@ -151,53 +151,62 @@ def ts_hash(filename, chromsizes):
     return f"{filename}.{cs_hash}"
 
 
-def single_tile(filename, chromsizes, tsinfo, z, x, y):
+def bedpe_to_df(filename, chromsizes, tsinfo):
+    """Prepare the bedpe file so that we can query it."""
     hash_ = ts_hash(filename, chromsizes)
 
     # hash the loaded data table so that we don't have to read the entire thing
     # and calculate cumulative start and end positions
     val = cache.get(hash_)
 
-    if val is None:
-        skiprows = 0
+    if val:
+        return val
 
-        # if this file has a header, skip the first row
-        if len(tsinfo["header"]):
-            skiprows = 1
+    skiprows = 0
 
-        t = pd.read_csv(
-            filename,
-            header=None,
-            comment="#",
-            sep="\t",
-            compression=get_compression(filename),
-            skiprows=skiprows,
-        )
+    # if this file has a header, skip the first row
+    if len(tsinfo["header"]):
+        skiprows = 1
 
-        cache.set(hash_, t)
+    t = pd.read_csv(
+        filename,
+        header=None,
+        comment="#",
+        sep="\t",
+        compression=get_compression(filename),
+        skiprows=skiprows,
+    )
 
-        orig_columns = t.columns
-        css = chromsizes.cumsum().shift().fillna(0).to_dict()
+    cache.set(hash_, t)
 
-        # xStart and xEnd are cumulative start and end positions calculated
-        # as if the chromosomes are concatenated from end to end
-        t["xChromStart"] = [
-            css[str(x)] for x in t[0].values
-        ]  # .astype("str").map(lambda x: css[str(x)])
-        t["yChromStart"] = [
-            css[str(x)] for x in t[3].values
-        ]  # .astype("str").map(lambda x: css[str(x)])
+    orig_columns = t.columns
+    css = chromsizes.cumsum().shift().fillna(0).to_dict()
 
-        t["xStart"] = t["xChromStart"] + t[1]
-        t["xEnd"] = t["xChromStart"] + t[2]
+    # xStart and xEnd are cumulative start and end positions calculated
+    # as if the chromosomes are concatenated from end to end
+    t["xChromStart"] = [
+        css[str(x)] for x in t[0].values
+    ]  # .astype("str").map(lambda x: css[str(x)])
+    t["yChromStart"] = [
+        css[str(x)] for x in t[3].values
+    ]  # .astype("str").map(lambda x: css[str(x)])
 
-        t["yStart"] = t["yChromStart"] + t[4]
-        t["yEnd"] = t["yChromStart"] + t[5]
+    t["xStart"] = t["xChromStart"] + t[1]
+    t["xEnd"] = t["xChromStart"] + t[2]
 
-        t["ix"] = t.index
+    t["yStart"] = t["yChromStart"] + t[4]
+    t["yEnd"] = t["yChromStart"] + t[5]
 
-        val = {"rows": t, "orig_columns": orig_columns, "css": css}
-        cache.set(hash_, val)
+    t["ix"] = t.index
+
+    val = {"rows": t, "orig_columns": orig_columns, "css": css}
+    cache.set(hash_, val)
+
+    return val
+
+
+def single_2d_tile(filename, chromsizes, tsinfo, z, x, y):
+    val = bedpe_to_df(filename, chromsizes, tsinfo)
 
     t = val["rows"]
     orig_columns = val["orig_columns"]
@@ -223,6 +232,30 @@ def single_tile(filename, chromsizes, tsinfo, z, x, y):
     return list(ret.values)
 
 
+def single_1d_tile(filename, chromsizes, tsinfo, z, x):
+    val = bedpe_to_df(filename, chromsizes, tsinfo)
+
+    t = val["rows"]
+    orig_columns = val["orig_columns"]
+    css = val["css"]
+
+    xTileStart = x * tsinfo["max_width"] / 2 ** z
+    xTileEnd = (x + 1) * tsinfo["max_width"] / 2 ** z
+
+    t = t.query(
+        f"xEnd >= {xTileStart} & xStart <= {xTileEnd} | "
+        + f"yEnd >= {xTileStart} & yStart <= {xTileEnd}"
+    )
+    MAX_PER_TILE = 512
+
+    t = t.sample(MAX_PER_TILE) if len(t) > MAX_PER_TILE else t
+
+    ret = t.apply(
+        ft.partial(row_to_bedlike, css=css, orig_columns=orig_columns), axis=1
+    )
+    return list(ret.values)
+
+
 def tiles(filename, tile_ids, chromsizes):
     tsinfo = tileset_info(filename, chromsizes)
 
@@ -235,14 +268,19 @@ def tiles(filename, tile_ids, chromsizes):
         tile_position = list(map(int, tile_id_parts[1:4]))
         tile_options = dict([o.split(":") for o in tile_option_parts])
 
-        if len(tile_position) < 3:
-            raise IndexError("Not enough tile info present")
+        if len(tile_position) < 2:
+            raise IndexError("Not enough tile info present (z.x[.y])")
 
         z = tile_position[0]
         x = tile_position[1]
-        y = tile_position[2]
 
-        values = single_tile(filename, chromsizes, tsinfo, z, x, y)
+        if len(tile_position) == 2:
+            values = single_1d_tile(filename, chromsizes, tsinfo, z, x)
+
+        else:
+            y = tile_position[2]
+
+            values = single_2d_tile(filename, chromsizes, tsinfo, z, x, y)
 
         tile_values += [(tile_id, values)]
 
