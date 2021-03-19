@@ -311,5 +311,9 @@ def tiles(
     samfile = pysam.AlignmentFile(filename, index_filename=index_filename)
 
     return alignment_tiles(
-        samfile, tile_ids, index_filename=None, chromsizes=None, max_tile_width=None
+        samfile,
+        tile_ids,
+        index_filename=index_filename,
+        chromsizes=chromsizes,
+        max_tile_width=None,
     )
