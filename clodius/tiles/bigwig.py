@@ -1,12 +1,13 @@
-import bbi
-import clodius.tiles.format as hgfo
 import functools as ft
 import logging
+import re
+from concurrent.futures import ThreadPoolExecutor
+
 import numpy as np
 import pandas as pd
-import re
 
-from concurrent.futures import ThreadPoolExecutor
+import bbi
+import clodius.tiles.format as hgfo
 
 MAX_THREADS = 4
 TILE_SIZE = 1024
