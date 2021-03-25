@@ -1,5 +1,6 @@
 import functools as ft
 import logging
+import math
 import re
 from concurrent.futures import ThreadPoolExecutor
 
@@ -191,9 +192,10 @@ def fetch_data(a):
         else:
             x[:] = bbi.fetch(*args, **dict(kwargs, summary=aggregation_mode))
 
-        # drop the very last bin if it is smaller than the binsize
-        if end == clen and clen % binsize != 0:
-            x = x[:-1]
+        # the following is commented out because it is handled in get_bigwig_tile
+        # # drop the very last bin if it is smaller than the binsize
+        # if end == clen and clen % binsize != 0:
+        #     x = x[:-1]
     except IndexError:
         # beyond the range of the available chromosomes
         # probably means we've requested a range of absolute
@@ -236,7 +238,36 @@ def get_bigwig_tile(
             )
         )
 
-    return np.concatenate(arrays)
+    current_data_position = 0
+    current_binned_data_position = 0
+
+    new_arrays = []
+
+    for ((cid, start, end), x) in zip(cids_starts_ends, arrays):
+        current_data_position += end - start
+
+        start_pos = math.floor(start / binsize)
+        end_pos = math.ceil(end / binsize)
+
+        # print("start", start, "end", end)
+        # print("start_pos", start_pos, "end_pos", end_pos)
+        # print("# bins calc", end_pos - start_pos)
+        # print("# bins actual", len(x))
+
+        if start_pos >= end_pos:
+            continue
+
+        current_binned_data_position += binsize * (end_pos - start_pos)
+        offset = current_binned_data_position - current_data_position
+
+        if offset > binsize:
+            current_binned_data_position -= binsize
+            x = x[:-1]
+
+        new_arrays.append(x)
+
+    ret = np.concatenate(new_arrays)
+    return ret
 
 
 def tiles(bwpath, tile_ids, chromsizes_map={}, chromsizes=None):
