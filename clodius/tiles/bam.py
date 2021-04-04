@@ -1,9 +1,11 @@
+import json
 import math
 
 import numpy as np
 
 import clodius.tiles.bigwig as ctbw
 import pysam
+from clodius.tiles.tabix import est_query_size_ix, load_bai_index
 from clodius.tiles.utils import abs2genomic
 
 
@@ -47,7 +49,9 @@ def get_cigar_substitutions(read):
     return subs
 
 
-def load_reads(samfile, start_pos, end_pos, chromsizes=None):
+def load_reads(
+    samfile, start_pos, end_pos, chromsizes=None, index_filename=None, cache=None
+):
     """
     Sample reads from the specified region, assuming that the chromosomes
     are ordered in some fashion. Returns an list of pysam reads
@@ -63,6 +67,9 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
     chromsize: pandas.Series
         A listing of chromosome sizes. If not provided, the chromosome
         list will be extracted from the the bam file header
+    cache: 
+        An object that implements the `get`, `set` and `exists` methods
+        for caching data
 
     Returns
     -------
@@ -112,6 +119,19 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
     }
 
     strands = {True: "-", False: "+"}
+    import time
+
+    idx = load_bai_index(index_filename)
+
+    total_size = 0
+    # check the size of the file to load to get an approximation
+    # of whether we're going to return too much data
+    for cid, start, end in abs2genomic(lengths, start_pos, end_pos):
+        total_size += est_query_size_ix(idx[cid], start, end)
+
+    MAX_SIZE = 4e6
+    if total_size > MAX_SIZE:
+        return {"error": "Tile encompasses too much data: {total_size}"}
 
     for cid, start, end in abs2genomic(lengths, start_pos, end_pos):
         chr_offset = int(abs_chrom_offsets[cid])
@@ -152,27 +172,51 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
                     if read.is_read2:
                         id_suffix = "_2"
 
-                results["id"] += [read.query_name + id_suffix]
+                read_id = read.query_name + id_suffix
+                results["id"] += [read_id]
                 results["from"] += [int(read.reference_start + chr_offset)]
                 results["to"] += [int(read.reference_end + chr_offset)]
                 results["chrName"] += [read.reference_name]
                 results["chrOffset"] += [chr_offset]
                 results["cigar"] += [read.cigarstring]
                 results["mapq"] += [read.mapq]
-                if read.query_sequence:
-                    try:
-                        variants = [
-                            (r[0], r[1], read.query_sequence[r[0]])
-                            for r in read.get_aligned_pairs(with_seq=True)
-                            if r[2] is not None and r[2].islower()
-                        ]
-                    except ValueError:
-                        # Probably MD tag not present
-                        variants = []
+                # aligned_pairs = read.get_aligned_pairs(with_seq=True)
 
-                    results["variants"] += [variants]
+                # For ONT reads retrieving the variants can be a lengthy
+                # procedure. We can try to cache them
+                use_cache = read.query_length > 40000
+                if use_cache:
+                    variants = get_cached_variants(cache, read_id)
                 else:
-                    results["variants"] += []
+                    variants = None
+                # variants = None
+
+                if not variants:
+                    if read.query_sequence:
+                        # read.get_aligned_pairs(with_seq=True, matches_only=True)
+                        try:
+                            variants = [
+                                (r[0], r[1], read.query_sequence[r[0]])
+                                for r in read.get_aligned_pairs(
+                                    with_seq=True, matches_only=True
+                                )
+                                if start <= r[1] <= end
+                                and r[2] is not None
+                                and r[2].islower()
+                            ]
+                        except ValueError:
+                            # Probably MD tag not present
+                            variants = []
+
+                        if use_cache:
+                            set_cached_variants(cache, read_id, variants)
+
+                        results["variants"] += [variants]
+                    else:
+                        results["variants"] += []
+                else:
+                    results["variants"] += [variants]
+
                 results["cigars"] += [get_cigar_substitutions(read)]
                 tags = dict(read.tags)
                 results["tags.HP"] += [tags.get("HP", 0)]
@@ -187,6 +231,26 @@ def load_reads(samfile, start_pos, end_pos, chromsizes=None):
                 continue
 
     return results
+
+
+def get_cached_variants(cache, read_id):
+    """Try to get variants from a read we've seen before.
+
+    This is useful for ONT reads where there's many variants
+    per read and retrieving them takes a while.
+    """
+    cache_id = f"variants.{read_id}"
+    if cache and cache.exists(cache_id):
+        return json.loads(cache.get(cache_id))
+
+    return None
+
+
+def set_cached_variants(cache, read_id, variants):
+    """Save a set of variants to the cache."""
+    cache_id = f"variants.{read_id}"
+    if cache:
+        cache.set(cache_id, json.dumps(variants))
 
 
 def alignment_tileset_info(samfile, chromsizes):
@@ -245,7 +309,12 @@ def alignment_tileset_info(samfile, chromsizes):
 
 
 def alignment_tiles(
-    samfile, tile_ids, index_filename=None, chromsizes=None, max_tile_width=None
+    samfile,
+    tile_ids,
+    index_filename=None,
+    chromsizes=None,
+    max_tile_width=None,
+    cache=None,
 ):
     """
     Generate tiles from a bigwig file.
@@ -262,7 +331,9 @@ def alignment_tiles(
     max_tile_width: int
         How wide can each tile be before we return no data. This
         can be used to limit the amount of data returned.
-
+    cache: 
+        An object that implements the `get`, `set` and `exists` methods
+        for caching data
     Returns
     -------
     tile_list: [(tile_id, tile_data),...]
@@ -292,7 +363,12 @@ def alignment_tiles(
             end_pos = start_pos + tile_width
 
             tile_value = load_reads(
-                samfile, start_pos=start_pos, end_pos=end_pos, chromsizes=chromsizes
+                samfile,
+                start_pos=start_pos,
+                end_pos=end_pos,
+                chromsizes=chromsizes,
+                index_filename=index_filename,
+                cache=cache,
             )
             generated_tiles += [(tile_id, tile_value)]
 
@@ -306,7 +382,12 @@ def tileset_info(filename, chromsizes=None):
 
 
 def tiles(
-    filename, tile_ids, index_filename=None, chromsizes=None, max_tile_width=None
+    filename,
+    tile_ids,
+    index_filename=None,
+    chromsizes=None,
+    max_tile_width=None,
+    cache=None,
 ):
     samfile = pysam.AlignmentFile(filename, index_filename=index_filename)
 
@@ -316,4 +397,5 @@ def tiles(
         index_filename=index_filename,
         chromsizes=chromsizes,
         max_tile_width=None,
+        cache=cache,
     )

@@ -9,6 +9,39 @@ import numpy as np
 from clodius.tiles.bigwig import abs2genomic
 
 
+def load_bai_index(index_filename):
+    """Load a reduced version of a bai index so that we can
+    go through it and get a sense of how much data will be
+    retrieved by a query."""
+    with open(index_filename, "rb") as f:
+        b = bytearray(f.read())
+
+        [_, _, _, _, n_ref] = struct.unpack("<4cI", b[:8])
+        c = 8
+
+        indeces = []
+
+        for i in range(n_ref):
+            n_bin = struct.unpack("<I", b[c : c + 4])[0]
+            c += 4
+            bins = col.defaultdict(list)
+            for j in range(n_bin):
+                [bin_no, n_chunk] = struct.unpack("<II", b[c : c + 8])
+                c += 8
+
+                bytes_to_read = n_chunk * 2 * 8
+                unpack_str = f"<{2 * n_chunk}Q"
+                bins[bin_no] = struct.unpack(unpack_str, b[c : c + bytes_to_read])
+                c += bytes_to_read
+
+            n_intv = struct.unpack("<I", b[c : c + 4])[0]
+            c += 4 + 8 * n_intv
+
+            indeces += [bins]
+
+        return indeces
+
+
 def load_tbi_idx(index_filename):
     """Load a reduced version of a tabix index so that we can
     go through it and get a sense of how much data will be
@@ -96,18 +129,28 @@ def reg2bins(begin, end, n_lvls=5, min_shift=14):
         s -= 3
 
 
-def est_query_size(index, name, start, end):
-    if name not in index:
-        return 0
-    ix = index[name]
+def est_query_size_ix(ix, start, end):
     total_size = 0
 
     for bin in list(reg2bins(start, end)):
-        if ix[bin]:
-            for chunk in chunks(ix[bin], 2):
-                total_size += (chunk[1] >> 16) - (chunk[0] >> 16)
-    #             print(bin, chunk, ix[bin], (chunk[1] >> 16) - (chunk[0] >> 16))
+        if 4681 <= bin <= 37448:
+            # only consider the lowest level bins
+            if ix[bin]:
+                bin_size = 0
+                for chunk in chunks(ix[bin], 2):
+                    bin_size += (chunk[1] >> 16) - (chunk[0] >> 16)
+                    total_size += (chunk[1] >> 16) - (chunk[0] >> 16)
+                #             print(bin, chunk, ix[bin], (chunk[1] >> 16) - (chunk[0] >> 16))
+                # print(bin, bin_size)
     return total_size
+
+
+def est_query_size(index, name, start, end):
+    if name not in index:
+        return 0
+
+    ix = index[name]
+    return est_query_size_ix(ix, start, end)
 
 
 def single_indexed_tile(
@@ -155,7 +198,6 @@ def single_indexed_tile(
         return {"error": f"Tile too large {query_size}"}
 
     for (cid, start, end) in cids_starts_ends:
-        print('cid', cid)
         if cid >= len(chromsizes):
             continue
 

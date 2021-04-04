@@ -260,7 +260,7 @@ def abs2genomic(chromsizes, start_pos, end_pos):
     for cid in range(cid_lo, cid_hi):
         yield cid, start, chromsizes[cid]
         start = 0
-    yield cid_hi, start, rel_pos_hi
+    yield cid_hi, int(start), int(rel_pos_hi)
 
 
 class ChromosomeInterval(BaseModel):
