@@ -35,6 +35,9 @@ def tileset_info(db_file):
         "max_pos": [row[1]],
         "header": header,
         "version": version,
+        "chromsizes": list(
+            zip(row[3].split("\t"), [int(cs) for cs in row[4].split("\t")])
+        ),
     }
     conn.close()
 
