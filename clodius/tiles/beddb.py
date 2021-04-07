@@ -26,8 +26,6 @@ def tileset_info(db_file):
         "zoom_step": row[0],
         "max_length": row[1],
         "assembly": row[2],
-        "chrom_names": row[3],
-        "chrom_sizes": row[4],
         "tile_size": row[5],
         "max_zoom": row[6],
         "max_width": row[7],
