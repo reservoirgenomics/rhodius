@@ -23,6 +23,7 @@ def tileset_info(db_file):
         header = row[colnames.index("header")]
 
     ts_info = {
+        "version": 2,
         "zoom_step": row[0],
         "max_length": row[1],
         "assembly": row[2],
