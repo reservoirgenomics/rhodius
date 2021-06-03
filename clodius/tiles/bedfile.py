@@ -117,7 +117,7 @@ def single_indexed_tile(
     filename, index_filename, chromsizes, tsinfo, z, x, tbx_index, settings
 ):
     """Retrieve a single tile from an indexed bedfile."""
-    tb = pysam.TabixFile(filename, index=index_filename)
+    tb = pysam.TabixFile(filename, index=index_filename, encoding="utf8")
     css = chromsizes.cumsum().shift().fillna(0).to_dict()
 
     def fetcher(ref, start, end):
