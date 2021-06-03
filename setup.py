@@ -25,7 +25,7 @@ install_requires = get_requirements("requirements.txt")
 
 setup(
     name="clodius",
-    version="0.26.4",
+    version="0.26.5",
     description="Tile generation for big data",
     author="Peter Kerpedjiev",
     author_email="pkerpedjiev@gmail.com",
