@@ -96,6 +96,8 @@ def row_to_bedlike(row, css, orig_columns):
 def get_compression(filename):
     if filename.endswith(".gz..") or filename.endswith(".gz"):
         return "gzip"
+    elif filename.endswith(".bgz..") or filename.endswith(".bgz"):
+        return "gzip"
     elif filename.endswith(".bz2..") or filename.endswith(".bz2"):
         return "bz2"
     elif filename.endswith(".zip..") or filename.endswith(".zip"):
