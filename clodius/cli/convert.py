@@ -18,6 +18,7 @@ from clodius.tiles.bam import get_cigar_substitutions
 
 from . import cli
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -551,3 +552,140 @@ def bamfile_to_multivec(filepath, index_filepath, output_file):
             output_file=output_file,
             tile_size=256,
         )
+
+
+def all_equal(arrays):
+    """Check if all the arrays in the list are equal."""
+    first_array = arrays[0]
+    for array in arrays[1:]:
+        if not np.all(array == first_array):
+            return False
+    return True
+
+
+def check_metadata_equal(files):
+    """Check that the metadata for all input multivec files is equal.
+
+    Params:
+        files: List[h5py.File]
+
+    Returns:
+        True if all equal, False otherwise
+    """
+    # check to make sure all multivecs have the same chromsizes
+    all_chroms = [f["chroms"]["name"][:] for f in files]
+
+    if not all_equal(all_chroms):
+        logger.error("Not all chromosome names are equal")
+        return False
+
+    all_chrom_lens = [f["chroms"]["name"][:] for f in files]
+    if not all_equal(all_chrom_lens):
+        logger.error("Not all chromosome names are equal")
+        return False
+
+    # check that all input files have the same resolutions
+    all_resolutions = [
+        np.array([int(r) for r in f["resolutions"].keys()]) for f in files
+    ]
+
+    if not all_equal(all_resolutions):
+        logger.error("Not all resolutions are equal")
+        return False
+
+    if "row_infos" in files[0]["info"]:
+        all_infos = [f["info"]["row_infos"] for f in files]
+
+        if not all_equal(all_infos):
+            logger.error("Not all row infos are equal")
+            return False
+
+    tile_sizes = [f["info"].attrs["tile-size"] for f in files]
+    first = tile_sizes[0]
+    if not all(first == x for x in tile_sizes):
+        logger.error("Not all tile sizes equal")
+        return False
+
+    return True
+
+
+@convert.command()
+@click.argument("filepaths", nargs=-1)
+@click.argument("output_file")
+@click.option(
+    "--chrom", default=None,
+)
+def combine_multivecs(filepaths, output_file, chrom):
+    """Convert a BAM file to a multivec representation."""
+    # check to make sure they have identical
+    only_chrom = chrom
+
+    if len(filepaths) == 0:
+        logger.error("Please specify at least one input file")
+        return 1
+
+    files = [h5py.File(fp, "r") for fp in filepaths]
+    logger.info("combining multivecs into %s", output_file)
+
+    if not check_metadata_equal(files):
+        return 1
+
+    new_file = h5py.File(output_file, "w")
+
+    new_file.create_group("chroms")
+    new_file.create_group("resolutions")
+    new_file.create_group("info")
+
+    new_file["info"].attrs["tile-size"] = files[0]["info"].attrs["tile-size"]
+
+    chrom_names = files[0]["chroms"]["name"][:]
+    chrom_lengths = files[0]["chroms"]["length"][:]
+
+    if only_chrom:
+        (chrom_names, chrom_lengths) = zip(
+            *[
+                (name, length)
+                for name, length in zip(chrom_names, chrom_lengths)
+                if name.decode("utf8") == only_chrom
+            ]
+        )
+
+    new_file["chroms"].create_dataset("name", data=chrom_names, compression="gzip")
+    new_file["chroms"].create_dataset("length", data=chrom_lengths, compression="gzip")
+
+    # create the new resolutions
+    for resolution in files[0]["resolutions"].keys():
+        curr_res = new_file["resolutions"].create_group(str(resolution))
+
+        curr_res.create_group("chroms")
+        curr_res.create_group("values")
+
+        curr_res["chroms"].create_dataset(
+            "name", data=chrom_names, compression="gzip",
+        )
+        curr_res["chroms"].create_dataset(
+            "length", data=chrom_lengths, compression="gzip",
+        )
+
+        for chrom, length in zip(chrom_names, chrom_lengths):
+            if only_chrom:
+                if chrom.decode("utf8") != only_chrom:
+                    continue
+
+            new_shape = (
+                files[0]["resolutions"][str(resolution)]["values"][chrom].shape[0],
+                len(files),
+            )
+            curr_res["values"].create_dataset(
+                chrom, shape=new_shape, compression="gzip"
+            )
+
+            for i, file in enumerate(files):
+                # print(
+                #     "len",
+                #     len(file["resolutions"][str(resolution)]["values"][chrom][:, 0]),
+                # )
+                logging.info("adding %s %s %s", resolution, chrom, file)
+                curr_res["values"][chrom][:, i] = file["resolutions"][str(resolution)][
+                    "values"
+                ][chrom][:, 0]

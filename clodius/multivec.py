@@ -47,7 +47,8 @@ def bedfile_to_multivec(
     batch_start_index = 0
 
     if has_header:
-        files[0].readline()
+        for file in files:
+            file.readline()
 
     prev_chrom = None
 
@@ -244,7 +245,7 @@ def create_multivec_multires(
             print("Missing chrom {} in input file".format(chrom), file=sys.stderr)
             continue
 
-        # print("creating new dataset")
+        print("creating new dataset")
         f["resolutions"][str(curr_resolution)]["values"].create_dataset(
             str(chrom), array_data[chrom].shape, compression="gzip"
         )
