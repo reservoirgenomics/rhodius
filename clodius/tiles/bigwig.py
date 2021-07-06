@@ -20,6 +20,7 @@ aggregation_modes["mean"] = {"name": "Mean", "value": "mean"}
 aggregation_modes["min"] = {"name": "Min", "value": "min"}
 aggregation_modes["max"] = {"name": "Max", "value": "max"}
 aggregation_modes["std"] = {"name": "Standard Deviation", "value": "std"}
+aggregation_modes["sum"] = {"name": "Sum", "value": "sum"}
 
 range_modes = {}
 range_modes["minMax"] = {"name": "Min-Max", "value": "minMax"}
@@ -153,7 +154,7 @@ def tileset_info(bwpath, chromsizes=None):
         "tile_size": TILE_SIZE,
         "max_zoom": max_zoom,
         "chromsizes": chromsizes_list,
-        "aggregation_modes": aggregation_modes,
+        "aggregation_modes": list(aggregation_modes.values()),
         "range_modes": range_modes,
     }
     return tileset_info
