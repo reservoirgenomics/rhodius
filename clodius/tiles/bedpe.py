@@ -5,6 +5,7 @@ import os
 import random
 
 import pandas as pd
+from pandas.errors import EmptyDataError
 
 import clodius.tiles.tabix as ctt
 import pysam
@@ -77,22 +78,28 @@ def tileset_info(filename, chromsizes=None):
         header=None,
         compression=get_compression(filename),
     )
-    t_head = pd.read_csv(
-        filename,
-        nrows=2,
-        sep="\t",
-        comment="#",
-        header=None,
-        skiprows=1,
-        compression=get_compression(filename),
-    )
 
-    if (t.dtypes == t_head.dtypes).all():
+    header = ""
+
+    try:
+        t_head = pd.read_csv(
+            filename,
+            nrows=2,
+            sep="\t",
+            comment="#",
+            header=None,
+            skiprows=1,
+            compression=get_compression(filename),
+        )
+
+        if (t.dtypes == t_head.dtypes).all():
+            has_header = False
+            header = ""
+        else:
+            header = "\t".join(t.head().values[0])
+            has_header = True
+    except EmptyDataError:
         has_header = False
-        header = ""
-    else:
-        header = "\t".join(t.head().values[0])
-        has_header = True
 
     if chromsizes is None:
         return {"error": "No chromsizes found. Make sure the assembly: tag is set"}
