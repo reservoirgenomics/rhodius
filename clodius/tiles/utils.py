@@ -278,7 +278,6 @@ def abs2genome_fn(chromsizes_filename, start, end):
     E.g. (1000,2000) => [('chr1', 1000, 1500), ('chr2', 1500, 2000)]
     """
     (chrom_info, chrom_names, chrom_sizes) = load_chromsizes(chromsizes_filename)
-
     for cid, start, end in abs2genomic(chrom_sizes, start, end):
         try:
             yield ChromosomeInterval(
@@ -287,24 +286,6 @@ def abs2genome_fn(chromsizes_filename, start, end):
         except IndexError:
             # we've gone beyond the last chromosome so stop iterating
             return
-
-
-def abs2genome_fn(chromsizes_filename, start, end):
-    """Convert an absolute genomic range to sections of genomic ranges.
-
-    E.g. (1000,2000) => [('chr1', 1000, 1500), ('chr2', 1500, 2000)]
-    """
-    (chrom_info, chrom_names, chrom_sizes) = load_chromsizes(chromsizes_filename)
-
-    for cid, start, end in abs2genomic(chrom_sizes, start, end):
-        try:
-            yield ChromosomeInterval(
-                cid=cid, name=chrom_names[cid], start=start, end=end
-            )
-        except IndexError:
-            # we've gone beyond the last chromosome so stop iterating
-            return
-    yield cid_hi, start, rel_pos_hi
 
 
 def get_quadtree_depth(chromsizes, tile_size_bp):

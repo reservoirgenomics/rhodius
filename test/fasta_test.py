@@ -15,10 +15,26 @@ def test_tileset_info():
     assert "max_width" in tsinfo
 
 
-def test_tiles():
-    tiles = ctf.tiles(fasta_filename, fai_filename, ["x.0.0"])
+def test_multivec_tiles():
+    tiles = ctf.multivec_tiles(
+        fasta_filename, index_filename=fai_filename, tile_ids=["x.0.0"]
+    )
 
     tsinfo = ctf.tileset_info(fai_filename)
 
-    # make sure we get as much text as we're expecting
-    assert len(tiles[0][1]['seq']) == tsinfo['max_pos'][0]
+    assert "shape" in tiles[0][1]
+
+
+def test_sequence_tiles():
+
+    tsinfo = ctf.tileset_info(fai_filename)
+
+    tiles = ctf.sequence_tiles(
+        fasta_filename, index_filename=fai_filename, tile_ids=["x.2.0"]
+    )
+    assert len(tiles[0][1]["sequence"]) == ctf.TILE_SIZE
+
+    tiles = ctf.sequence_tiles(
+        fasta_filename, index_filename=fai_filename, tile_ids=["x.0.0"]
+    )
+    assert len(tiles[0][1]["sequence"]) == tsinfo["max_pos"][0]
