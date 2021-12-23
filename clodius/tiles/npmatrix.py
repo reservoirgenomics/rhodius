@@ -1,5 +1,7 @@
 import math
+
 import numpy as np
+
 import clodius.tiles.format as hgfo
 
 
@@ -108,15 +110,17 @@ def tiles(grid, z, x, y, nan_grid=None, bin_size=256):
     # print("data:", data)
 
     # add some data so that the data can be divided into squares
-    divisible_x_width = num_to_sum * math.ceil(data.shape[0] / num_to_sum)
-    divisible_y_width = num_to_sum * math.ceil(data.shape[1] / num_to_sum)
+    divisible_x_width = num_to_sum * math.ceil(max(data.shape[0], 1) / num_to_sum)
+    divisible_y_width = num_to_sum * math.ceil(max(data.shape[1], 1) / num_to_sum)
 
     divisible_x_pad = divisible_x_width - data.shape[0]
     divisible_y_pad = divisible_y_width - data.shape[1]
-    # print("data.shape", data.shape)
 
-    # print("divisible_x_pad:", divisible_x_pad)
-    # print("divisible_y_pad:", divisible_y_pad)
+    print("data.shape", data.shape)
+    print("data", data)
+
+    print("divisible_x_pad:", divisible_x_pad)
+    print("divisible_y_pad:", divisible_y_pad)
 
     a = np.pad(
         data,
@@ -126,6 +130,7 @@ def tiles(grid, z, x, y, nan_grid=None, bin_size=256):
     )
 
     b = np.nansum(a.reshape((a.shape[0], -1, num_to_sum)), axis=2)
+    print("b", b)
     ret_array = np.nansum(b.T.reshape(b.shape[1], -1, num_to_sum), axis=2).T
     ret_array[ret_array == 0.0] = np.nan
     # print('ret_array:', ret_array)

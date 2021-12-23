@@ -89,7 +89,7 @@ def get_single_tile(filename, tile_pos):
     resolution = tsinfo["resolutions"][tile_pos[0]]
     tile_size = tsinfo["tile_size"]
 
-    # where in the data does the tile start and end
+    # where in the data does the tile start ande nd
     tile_start = tile_pos[1] * tile_size * resolution
     tile_end = tile_start + tile_size * resolution
 
@@ -98,7 +98,9 @@ def get_single_tile(filename, tile_pos):
     # dense = f['resolutions'][str(resolution)][tile_start:tile_end]
     dense = get_tile(f, chromsizes, resolution, tile_start, tile_end, tsinfo["shape"])
     # print("dense.shape", dense.shape)
-
+    if 'default_row_ordering' in tsinfo:
+        dense = dense.T[tsinfo['default_row_ordering']].T
+    
     if len(dense) < tsinfo["tile_size"]:
         # if there aren't enough rows to fill this tile, add some zeros
         dense = np.vstack(
@@ -297,7 +299,6 @@ def tileset_info(filename):
                 tileset_info["category_infos"] = json.loads(
                     f["info"]["category_infos"][()].decode("utf8")
                 )
-
     if "row_infos" in f["info"]:
         row_infos_encoded = f["info"]["row_infos"][()]
         tileset_info["row_infos"] = json.loads(row_infos_encoded)
@@ -316,6 +317,12 @@ def tileset_info(filename):
                 ]
             except json.JSONDecodeError:
                 tileset_info["row_infos"] = [r.decode("utf8") for r in row_infos]
+
+    if 'info' in f and 'default_row_ordering' in f['info']:
+        tileset_info['default_row_ordering'] = [int(o) for o in f['info']['default_row_ordering'][:]]
+        if 'row_infos' in tileset_info:
+            tileset_info['row_infos'] = [tileset_info['row_infos'][i] for i in tileset_info['default_row_ordering']]
+
 
     f.close()
 

@@ -217,6 +217,7 @@ class TileInfo(BaseModel):
     width: Optional[int]
     start: List[int]
     end: List[int]
+    options: dict
 
     @validator("zoom")
     def zoom_zero_or_greater(cls, v):
@@ -242,12 +243,15 @@ def parse_tile_id(tile_id, tsinfo):
         for (i, pos) in enumerate(tile_position[1:])
     ]
 
+    tile_options = dict([o.split(":") for o in tile_id.split("|")[1:]])
+
     return TileInfo(
         zoom=zoom_level,
         position=tile_position[1:],
         width=tile_width,
         start=starts,
         end=ends,
+        options=tile_options,
     )
 
 

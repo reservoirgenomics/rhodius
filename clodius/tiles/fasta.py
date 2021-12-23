@@ -5,7 +5,7 @@ import numpy as np
 
 import clodius.tiles.chromsizes as cts
 from clodius.tiles.format import format_dense_tile
-from clodius.tiles.utils import TilesetInfo, abs2genome_fn, parse_tile_id
+from clodius.tiles.utils import TileInfo, TilesetInfo, abs2genome_fn, parse_tile_id
 from pysam import FastaFile
 
 TILE_SIZE = 1024
@@ -107,7 +107,9 @@ def sequence_tiles(
         chromsizes_fn = index_filename
 
     for tile_id in tile_ids:
-        tile_info = parse_tile_id(tile_id, tsinfo)
+        tile_info: TileInfo = parse_tile_id(tile_id, tsinfo)
+
+        print("tile_info", tile_info)
 
         zoom_diff = tsinfo.max_zoom - tile_info.zoom
         if zoom_diff > 3:
@@ -126,6 +128,7 @@ def sequence_tiles(
         for chr_interval in abs2genome_fn(
             chromsizes_fn, tile_info.start[0], tile_info.end[0]
         ):
+            print("start", chr_interval.start)
             seq += fa_file.fetch(
                 chr_interval.name, chr_interval.start, chr_interval.end
             )

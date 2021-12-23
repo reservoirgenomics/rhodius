@@ -11,6 +11,8 @@ fai_filename = op.join(
 def test_tileset_info():
     tsinfo = ctf.tileset_info(fai_filename)
 
+    print("tsinfo", tsinfo)
+
     assert "max_zoom" in tsinfo
     assert "max_width" in tsinfo
 
@@ -38,3 +40,10 @@ def test_sequence_tiles():
         fasta_filename, index_filename=fai_filename, tile_ids=["x.0.0"]
     )
     assert len(tiles[0][1]["sequence"]) == tsinfo["max_pos"][0]
+
+
+def test_zero_based_sequence_tiles():
+    tiles = ctf.sequence_tiles(
+        fasta_filename, index_filename=fai_filename, tile_ids=["x.2.0"]
+    )
+    print("tiles", tiles)
