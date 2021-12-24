@@ -18,3 +18,4 @@ wget -q -NP data/ https://s3.amazonaws.com/pkerp/public/hg38.chrom.sizes
 wget -q -NP data/ https://s3.amazonaws.com/pkerp/public/regions.valid.bed
 wget -q -NP data/ https://s3.amazonaws.com/pkerp/public/regions.spaces.bed
 wget -q -NP data/ https://s3.amazonaws.com/pkerp/public/chm13v1.chrom.sizes
+wget -q -NP data/ https://s3.amazonaws.com/pkerp/public/wgEncodeCaltechRnaSeqHelas3R1x75dTh1014IlnaPlusSignalRep1.bigWig

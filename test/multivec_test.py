@@ -139,7 +139,6 @@ def test_ignore_bedfile_headers():
     # import traceback
     a, b, tb = result.exc_info
 
-
 def test_retain_lines():
     runner = clt.CliRunner()
     input_file = op.join(testdir, "sample_data", "sample2.multival.bed")
@@ -218,3 +217,50 @@ def test_chr_boundaries_states():
 
     assert tile3[135][0] == 1.0 and tile3[135][1] == 0.0
     assert tile3[136][0] == 0.0 and tile3[136][1] == 1.0
+
+def test_default_row_ordering():
+    runner = clt.CliRunner()
+    input_file1 = 'data/wgEncodeCaltechRnaSeqHuvecR1x75dTh1014IlnaPlusSignalRep2.bigWig'
+    input_file2 = 'data/wgEncodeCaltechRnaSeqHelas3R1x75dTh1014IlnaPlusSignalRep1.bigWig'
+    
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        out_file = op.join(tmp_dir, "out.multivec")
+        row_infos_file = op.join(tmp_dir, 'row_infos.txt')
+        chromsizes_file = op.join(tmp_dir, 'chrom.sizes')
+
+        with open(row_infos_file, 'w') as f:
+            f.write('row1\nrow2')
+        
+        with open(chromsizes_file, 'w') as f:
+            f.write("chr1\t100000")
+
+        result = runner.invoke(
+            ccc.bigwigs_to_multivec,
+            [
+                input_file1, input_file2,
+                '--row-infos-filename',
+                row_infos_file,
+                '--chromsizes-filename',
+                chromsizes_file,
+                '--output-file',
+                out_file
+            ],
+            catch_exceptions=False
+        )
+
+        a, b, tb = result.exc_info
+
+        from clodius.tiles.multivec import tileset_info, get_tile
+        import numpy as np
+
+        tsinfo = tileset_info(out_file)
+
+        # get first unordered tileset info and tile
+        assert tsinfo['row_infos'][0] == 'row1'
+        with h5py.File(out_file, 'r+') as f:
+            f['info'].create_dataset('default_row_ordering', data=np.array([1,0]))
+
+        tsinfo = tileset_info(out_file)
+        assert tsinfo['row_infos'][0] == 'row2'
+        
+    # import traceback

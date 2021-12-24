@@ -209,6 +209,7 @@ def create_multivec_multires(
         # array data probably isn't an HDF5 file
         pass
 
+    print('row_infos', row_infos)
     # add the row_info information
     if row_infos is not None:
         f["info"].create_dataset("row_infos", data=json.dumps(row_infos))
