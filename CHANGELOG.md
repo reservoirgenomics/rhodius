@@ -1,5 +1,11 @@
 v0.15.1
 
+v0.29.0
+
+- Added the `default_row_ordering` parameter to multivec files under `/info/default_row_ordering` so that one can specify a default order for the rows to be displayed in in a multivec
+
+## Older
+
 - Added support for multivec `row_infos` stored under `/info/row_infos` as an hdf5 utf-8 string dataset.
 
 v0.15.0
