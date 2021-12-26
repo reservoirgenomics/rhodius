@@ -153,6 +153,7 @@ def create_multivec_multires(
     tile_size=1024,
     output_file="/tmp/my_file.multires",
     row_infos=None,
+    resolution_multiplier=2,
 ):
     """
     Create a multires file containing the array data
@@ -209,7 +210,6 @@ def create_multivec_multires(
         # array data probably isn't an HDF5 file
         pass
 
-    print('row_infos', row_infos)
     # add the row_info information
     if row_infos is not None:
         f["info"].create_dataset("row_infos", data=json.dumps(row_infos))
@@ -269,7 +269,7 @@ def create_multivec_multires(
     total_length = sum(lengths)
     # print("total_length:", total_length, "tile_size:", tile_size, "starting_resolution:", starting_resolution)
     max_zoom = math.ceil(
-        math.log(total_length / (tile_size * starting_resolution)) / math.log(2)
+        math.log(total_length / (tile_size * starting_resolution)) / math.log(resolution_multiplier)
     )
 
     # we're going to go through and create the data for the different
@@ -279,7 +279,7 @@ def create_multivec_multires(
     for i in range(max_zoom):
         # each subsequent zoom level will have half as much data
         # as the previous
-        curr_resolution = prev_resolution * 2
+        curr_resolution = prev_resolution * resolution_multiplier
         f["resolutions"].create_group(str(curr_resolution))
 
         f["resolutions"][str(curr_resolution)].create_group("chroms")

@@ -1,8 +1,7 @@
-v0.15.1
-
 v0.29.0
 
 - Added the `default_row_ordering` parameter to multivec files under `/info/default_row_ordering` so that one can specify a default order for the rows to be displayed in in a multivec
+- Added `--resolution-multiplier` parameter to `create_multivec_multires` which lets you make resolutions that are not multiples of 2. This can save space with large files
 
 ## Older
 

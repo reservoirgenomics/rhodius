@@ -591,6 +591,11 @@ def bamfile_to_multivec(filepath, index_filepath, output_file):
     "Used to determine the number of zoom levels"
     "to create.",
 )
+@click.option(
+    "--resolution-multiplier",
+    default=2,
+    help="The multiples of base resolution to use when coarsifying.",
+)
 def bigwigs_to_multivec(
     filepaths,
     output_file,
@@ -598,6 +603,7 @@ def bigwigs_to_multivec(
     chromsizes_filename,
     row_infos_filename,
     tile_size,
+    resolution_multiplier
 ):
     with tempfile.TemporaryDirectory() as td:
         temp_file = op.join(td, "temp.mv5")
@@ -664,4 +670,5 @@ def bigwigs_to_multivec(
             tile_size=tile_size,
             output_file=output_file,
             row_infos=row_infos,
+            resolution_multiplier=resolution_multiplier
         )
