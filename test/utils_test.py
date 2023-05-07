@@ -3,7 +3,12 @@ from __future__ import print_function
 import os.path as op
 
 import clodius.utils as cu
-from clodius.tiles.utils import abs2genome_fn
+from clodius.tiles.utils import (
+    abs2genome_fn,
+    parse_tile_id,
+    parse_tile_position,
+    TilesetInfo,
+)
 
 
 def test_infer_filetype():
@@ -30,3 +35,33 @@ def test_abs2genome_fn():
 
     assert len(sections) == 3
     assert sections[0].end == 640
+
+
+def test_parse_tile_position():
+    tsinfo = TilesetInfo(
+        max_width=2**16,
+        max_zoom=4,
+        min_pos=[0, 0],
+        max_pos=[2**15 + 10, 2**15 + 10],
+    )
+
+    x = parse_tile_position([1, 2], tsinfo)
+
+    assert x.zoom == 1
+    assert x.position[0] == 2
+    assert x.start[0] == 65536
+    assert x.end[0] == 98304
+
+
+def test_parse_tile_id():
+    tsinfo = TilesetInfo(
+        max_width=2**16,
+        max_zoom=4,
+        min_pos=[0, 0],
+        max_pos=[2**15 + 10, 2**15 + 10],
+    )
+    x = parse_tile_id("uid.1.2", tsinfo)
+
+    assert x.zoom == 1
+    assert x.position[0] == 2
+    assert x.start[0] == 65536
