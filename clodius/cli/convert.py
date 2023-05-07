@@ -15,6 +15,11 @@ import clodius.multivec as cmv
 import negspy.coordinates as nc
 import scipy.misc as sm
 from clodius.tiles.bam import get_cigar_substitutions
+from clodius.tiles.utils import calc_max_width
+from collections import defaultdict
+
+from typing import Optional
+import time
 
 from . import cli
 
@@ -432,6 +437,196 @@ def bedfile_to_multivec(
         row_infos_filename,
         tile_size,
         method,
+    )
+
+
+def chrom_width(chrom, chrom_info):
+    return 2 ** (math.ceil(math.log(chrom_info.chrom_lengths[line[0]]) / math.log(2)))
+
+
+def line_tiles(line, chrom_info):
+    """
+    Given a line from a bed file, return the zoom level
+    """
+    chrom_len = calc_max_width(chrom_info.chrom_lengths[line[0]])
+    interval_len = int(line[2]) - int(line[1])
+    zoom_level = math.floor(math.log(chrom_len / interval_len) / math.log(2))
+
+    tile_size = int(chrom_len / 2**zoom_level)
+    tile_start = int(line[1]) // tile_size
+    tile_end = int(line[2]) // tile_size
+
+    return [
+        (zoom_level, tile_pos, interval_len, line)
+        for tile_pos in range(tile_start, tile_end + 1)
+    ]
+
+
+def promote_tiles(tiled_lines, max_per_tile=5):
+    """
+    For each tiled line, if there is space in a tile with a higher zoom level,
+    then change this tile's zoom level and tile position to the higher zoom level.
+    """
+    new_tiled_lines = []
+    tile_counts = defaultdict(int)
+
+    for zoom_level, tile_pos, interval_len, line in tiled_lines:
+        if zoom_level == 0:
+            continue
+
+        orig_zoom_level = zoom_level
+        orig_tile_pos = tile_pos
+
+        while (
+            zoom_level > 0
+            and tile_counts[(zoom_level - 1, tile_pos // 2)] < max_per_tile
+        ):
+            # print("promoting", zoom_level, tile_pos, interval_len, line)
+            zoom_level -= 1
+            tile_pos //= 2
+
+        new_tiled_lines.append((zoom_level, tile_pos, interval_len, line))
+        tile_counts[(zoom_level, tile_pos)] += 1
+
+        if tile_counts[(zoom_level, tile_pos)] > max_per_tile:
+            raise ValueError(
+                f"Too many items in this tile: {zoom_level}, {tile_pos}, {tile_counts[(zoom_level, tile_pos)]}"
+            )
+
+    return new_tiled_lines
+
+
+def dump_chunk_to_file(root, zoom_level, chunk):
+    logger.info(f"========= Dumping chunk: %d", zoom_level)
+    chunk = sorted(chunk)
+
+    ixs = [c[0] for c in chunk]
+    lines = [c[1] for c in chunk]
+
+    # print("tile counts", tile_counts[(zoom_level, 0)])
+
+    # print('zoom_level', zoom_level, 'ixs', ixs)
+    root[str(zoom_level)][ixs] = lines
+
+
+def _bedfile_to_hibed(
+    filepath: str,
+    output_file: Optional[str] = None,
+    assembly: Optional[str] = "hg19",
+    chromsizes_filename: Optional[str] = None,
+    max_per_tile: int = 1024,
+):
+    logging.basicConfig(level=logging.INFO)
+
+    (chrom_info, chrom_names, chrom_sizes) = cch.load_chromsizes(
+        chromsizes_filename, assembly
+    )
+
+    if output_file is None:
+        output_file = op.splitext(filepath)[0] + ".hibed"
+
+    with open(filepath) as f:
+        parts = [line.strip().split("\t") for line in f]
+        interval_lens = [int(parts[2]) - int(parts[1]) for parts in parts]
+
+        sorted_lines = [sl[1] for sl in sorted(zip(interval_lens, parts))[::-1]]
+
+    logger.info(
+        "Tiling on %d lines with max_per_tile of %d.", len(sorted_lines), max_per_tile
+    )
+
+    # add zoom level and tile position to each line
+    tiled_lines = []
+    for line in sorted_lines:
+        tiled_lines += line_tiles(line, chrom_info)
+
+    new_tiled_lines = promote_tiles(tiled_lines, max_per_tile=max_per_tile)
+    max_zoom_level = max([zoom_level for zoom_level, *_ in new_tiled_lines])
+    logger.info("Max zoom: %d", max_zoom_level)
+
+    if op.exists(output_file):
+        os.remove(output_file)
+
+    root = h5py.File(output_file, mode="w")
+    info = root.create_group("info")
+    info.attrs["max_per_tile"] = max_per_tile
+    info.attrs["max_zoom"] = max_zoom_level
+
+    dt = h5py.string_dtype(encoding="utf-8")
+
+    for zoom_level in range(0, max_zoom_level + 1):
+        num_tiles = 2**zoom_level
+        shape = (num_tiles * max_per_tile,)
+        root.create_dataset(str(zoom_level), shape=shape, dtype=dt, compression="gzip")
+
+    tile_counts = defaultdict(int)
+
+    chunk = []
+    max_chunk_size = 100
+    prev_zoom_level = None
+
+    new_tiled_lines = sorted(new_tiled_lines)
+
+    t1 = time.time()
+    for zoom_level, tile_pos, interval_len, line in new_tiled_lines:
+        ix = tile_pos * max_per_tile + tile_counts[(zoom_level, tile_pos)]
+
+        if (zoom_level != prev_zoom_level and prev_zoom_level != None) or len(
+            chunk
+        ) > max_chunk_size:
+            dump_chunk_to_file(root, prev_zoom_level, chunk)
+            chunk = []
+
+        # print("zoom_level", zoom_level, "tile_pos", tile_pos, "line", line)
+        if tile_counts[(zoom_level, tile_pos)] == max_per_tile:
+            raise ValueError(
+                f"Too many items in this tile: {zoom_level}, {tile_pos}, {tile_counts[(zoom_level, tile_pos)]}"
+            )
+
+        # print("adding", zoom_level, tile_pos, ix)
+        chunk += [(ix, "\t".join(line))]
+        tile_counts[(zoom_level, tile_pos)] += 1
+        prev_zoom_level = zoom_level
+
+    # print("adding last chunk", prev_zoom_level, chunk)
+    dump_chunk_to_file(root, prev_zoom_level, chunk)
+
+    logger.info("Finished writing to file: %f", time.time() - t1)
+
+
+@convert.command()
+@click.argument("filepath")
+@click.option(
+    "--output-file",
+    "-o",
+    default=None,
+    help="The default output file name to use. If this isn't"
+    "specified, clodius will replace the current extension"
+    "with .hibed",
+)
+@click.option(
+    "--assembly",
+    "-a",
+    help="The genome assembly that this file was created against",
+    type=click.Choice(nc.available_chromsizes()),
+    default="hg19",
+)
+@click.option(
+    "--chromsizes-filename",
+    help="A file containing chromosome sizes and order",
+    default=None,
+)
+@click.option(
+    "--max-per-tile",
+    "-t",
+    default=256,
+    help="The maximum number of items in each tile.",
+)
+def bedfile_to_hibed(
+    filepath, output_file, assembly, chromsizes_filename, max_per_tile
+):
+    _bedfile_to_hibed(
+        filepath, output_file, assembly, chromsizes_filename, max_per_tile
     )
 
 
