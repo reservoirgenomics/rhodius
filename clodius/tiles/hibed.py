@@ -2,6 +2,8 @@ import hashlib
 import random
 import h5py
 
+from clodius.tiles.utils import tiles_wrapper_1d
+
 from clodius.tiles.utils import (
     calc_max_width,
     interval_to_chrom_tiles,
@@ -10,6 +12,13 @@ from clodius.tiles.utils import (
 
 import math
 from clodius.tiles.utils import TilesetInfo
+
+
+def tile_entries_sorter(x):
+    return x["zoom"], x["xEnd"] - x["xStart"]
+
+
+MAX_PER_TILE = 2048
 
 
 def tileset_info(filename, chromsizes):
@@ -66,6 +75,8 @@ def single_chromosome_tile(
         z -= 1
         tile_pos //= 2
 
+        # print("z", z, "tile_pos", tile_pos, items)
+
         if str(z) in f:
             # If the requested zoom is higher than the max then we just
             # return the next lowest zoom
@@ -76,7 +87,6 @@ def single_chromosome_tile(
                 )
                 if len(x)
             ]
-    #             print("z", z, "tile_pos", tile_pos, items)
     formatted = []
 
     for z, row in items:
@@ -104,12 +114,14 @@ def single_chromosome_tile(
         }
         formatted += [ret]
 
-    sorted_formatted = sorted(formatted, key=lambda x: (x["zoom"], x["uid"]))
+    # sorted_formatted = sorted(formatted, key=lambda x: (x["zoom"], x["uid"]))
+    sorted_formatted = sorted(formatted, key=tile_entries_sorter)
     return sorted_formatted[:max_per_tile]
 
 
 def single_genome_tile(filename, chromsizes, tsinfo, z, x):
     chrom_tile_poss = []
+    # print("chromsizes", chromsizes.index)
     intervals = genome_tile_to_intervals(
         filename, chromsizes, TilesetInfo.parse_obj(tsinfo), z, x
     )
@@ -126,15 +138,23 @@ def single_genome_tile(filename, chromsizes, tsinfo, z, x):
             )
         ]
 
-    #     print("chrom_tile_poss", chrom_tile_poss)
+    # print("chrom_tile_poss", chrom_tile_poss)
     chrom_tiles = []
     for chrom, cz, cx in chrom_tile_poss:
-        if chrom == "chr10":
-            chrom_tiles += single_chromosome_tile(
-                filename, chromsizes, tsinfo, chrom, cz, cx
-            )
+        chrom_tile = single_chromosome_tile(filename, chromsizes, tsinfo, chrom, cz, cx)
+        chrom_tiles += chrom_tile
 
+    chrom_tiles = sorted(chrom_tiles, key=tile_entries_sorter)[:MAX_PER_TILE]
+    # print("len(chrom_tiles)", len(chrom_tiles))
     return chrom_tiles
+
+
+def tiles(filename, tile_ids, chromsizes):
+    tsinfo = tileset_info(filename, chromsizes)
+
+    return tiles_wrapper_1d(
+        tile_ids, lambda z, x: single_genome_tile(filename, chromsizes, tsinfo, z, x)
+    )
 
 
 # tileset_info(filename, chromsizes)
