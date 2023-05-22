@@ -15,7 +15,8 @@ from clodius.tiles.utils import TilesetInfo
 
 
 def tile_entries_sorter(x):
-    return x["zoom"], x["xEnd"] - x["xStart"]
+    # return x["zoom"], x["xEnd"] - x["xStart"]
+    return x["zoom"], x["uid"]
 
 
 MAX_PER_TILE = 2048
