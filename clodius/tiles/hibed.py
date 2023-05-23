@@ -19,7 +19,7 @@ def tile_entries_sorter(x):
     return x["zoom"], x["uid"]
 
 
-MAX_PER_TILE = 2048
+MAX_PER_TILE = 4096
 
 
 def tileset_info(filename, chromsizes):
