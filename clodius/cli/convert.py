@@ -5,9 +5,11 @@ import os
 import os.path as op
 import tempfile
 from tempfile import TemporaryDirectory
+from dataclasses import dataclass
 
 import h5py
 import numpy as np
+import json
 
 import click
 import clodius.chromosomes as cch
@@ -17,6 +19,8 @@ import scipy.misc as sm
 from clodius.tiles.bam import get_cigar_substitutions
 from clodius.tiles.utils import calc_max_width
 from collections import defaultdict
+import random
+from typing import List
 
 from typing import Optional
 import time
@@ -444,10 +448,18 @@ def chrom_width(chrom, chrom_info):
     return 2 ** (math.ceil(math.log(chrom_info.chrom_lengths[line[0]]) / math.log(2)))
 
 
-def line_tiles(line, chrom_info):
+@dataclass
+class ImportanceLine:
+    line: List[str]
+    importance: float
+
+
+def line_tiles(importance_line: ImportanceLine, chrom_info):
     """
     Given a line from a bed file, return the zoom level
     """
+    line = importance_line.line
+
     chrom_len = calc_max_width(chrom_info.chrom_lengths[line[0]])
     interval_len = int(line[2]) - int(line[1])
     zoom_level = math.floor(math.log(chrom_len / interval_len) / math.log(2))
@@ -457,7 +469,7 @@ def line_tiles(line, chrom_info):
     tile_end = int(line[2]) // tile_size
 
     return [
-        (zoom_level, tile_pos, interval_len, line)
+        (zoom_level, tile_pos, importance_line.importance, line)
         for tile_pos in range(tile_start, tile_end + 1)
     ]
 
@@ -470,7 +482,7 @@ def promote_tiles(tiled_lines, max_per_tile=5):
     new_tiled_lines = []
     tile_counts = defaultdict(int)
 
-    for zoom_level, tile_pos, interval_len, line in tiled_lines:
+    for zoom_level, tile_pos, importance, line in tiled_lines:
         if zoom_level == 0:
             continue
 
@@ -485,7 +497,7 @@ def promote_tiles(tiled_lines, max_per_tile=5):
             zoom_level -= 1
             tile_pos //= 2
 
-        new_tiled_lines.append((zoom_level, tile_pos, interval_len, line))
+        new_tiled_lines.append((zoom_level, tile_pos, importance, line))
         tile_counts[(zoom_level, tile_pos)] += 1
 
         if tile_counts[(zoom_level, tile_pos)] > max_per_tile:
@@ -515,9 +527,20 @@ def _bedfile_to_hibed(
     assembly: Optional[str] = "hg19",
     chromsizes_filename: Optional[str] = None,
     max_per_tile: int = 1024,
+    importance_column: int = None,
+    method="random",
 ):
     logging.basicConfig(level=logging.INFO)
 
+    if method not in ["random", "size", "column"]:
+        raise ValueError(
+            f"Unknown method {method}. Options are 'random' or 'size' or 'column'"
+        )
+
+    if method == "column" and importance_column is None:
+        raise ValueError(
+            'If method is "column", then importance_column must be specified'
+        )
     (chrom_info, chrom_names, chrom_sizes) = cch.load_chromsizes(
         chromsizes_filename, assembly
     )
@@ -527,18 +550,38 @@ def _bedfile_to_hibed(
 
     with open(filepath) as f:
         parts = [line.strip().split("\t") for line in f]
-        interval_lens = [int(parts[2]) - int(parts[1]) for parts in parts]
+        if method == "size":
+            interval_lens = [int(parts[2]) - int(parts[1]) for parts in parts]
+            # sorted_lines = [sl[1] for sl in sorted(zip(interval_lens, parts))[::-1]]
+            importance_lines = [
+                ImportanceLine(importance=importance, line=line)
+                for (importance, line) in zip(interval_lens, parts)
+            ]
+        elif method == "random":
+            importance_lines = [
+                ImportanceLine(importance=random.random(), line=line) for line in parts
+            ]
+        elif method == "column":
+            importance_lines = [
+                ImportanceLine(importance=float(line[importance_column - 1]), line=line)
+                for line in parts
+            ]
 
-        sorted_lines = [sl[1] for sl in sorted(zip(interval_lens, parts))[::-1]]
+    importance_lines = sorted(
+        importance_lines, key=lambda x: x.importance, reverse=True
+    )
+    print("importance_lines", importance_lines[0])
 
     logger.info(
-        "Tiling on %d lines with max_per_tile of %d.", len(sorted_lines), max_per_tile
+        "Tiling on %d lines with max_per_tile of %d.",
+        len(importance_lines),
+        max_per_tile,
     )
 
     # add zoom level and tile position to each line
     tiled_lines = []
-    for line in sorted_lines:
-        tiled_lines += line_tiles(line, chrom_info)
+    for importance_line in importance_lines:
+        tiled_lines += line_tiles(importance_line, chrom_info)
 
     new_tiled_lines = promote_tiles(tiled_lines, max_per_tile=max_per_tile)
     max_zoom_level = max([zoom_level for zoom_level, *_ in new_tiled_lines])
@@ -568,7 +611,7 @@ def _bedfile_to_hibed(
     new_tiled_lines = sorted(new_tiled_lines)
 
     t1 = time.time()
-    for zoom_level, tile_pos, interval_len, line in new_tiled_lines:
+    for zoom_level, tile_pos, importance, line in new_tiled_lines:
         ix = tile_pos * max_per_tile + tile_counts[(zoom_level, tile_pos)]
 
         if (zoom_level != prev_zoom_level and prev_zoom_level != None) or len(
@@ -584,7 +627,7 @@ def _bedfile_to_hibed(
             )
 
         # print("adding", zoom_level, tile_pos, ix)
-        chunk += [(ix, "\t".join(line))]
+        chunk += [(ix, json.dumps({"importance": importance, "line": "\t".join(line)}))]
         tile_counts[(zoom_level, tile_pos)] += 1
         prev_zoom_level = zoom_level
 
@@ -622,11 +665,36 @@ def _bedfile_to_hibed(
     default=256,
     help="The maximum number of items in each tile.",
 )
+@click.option(
+    "--importance-column",
+    default=None,
+    type=int,
+    help="The column (1-based) containing the importance values.",
+)
+@click.option(
+    "--method",
+    "-m",
+    default="random",
+    type=click.Choice(["random", "size", "column"]),
+    help="The method to use for tile promotion: random (the default) or size",
+)
 def bedfile_to_hibed(
-    filepath, output_file, assembly, chromsizes_filename, max_per_tile
+    filepath,
+    output_file,
+    assembly,
+    chromsizes_filename,
+    max_per_tile,
+    importance_column,
+    method,
 ):
     _bedfile_to_hibed(
-        filepath, output_file, assembly, chromsizes_filename, max_per_tile
+        filepath,
+        output_file,
+        assembly,
+        chromsizes_filename,
+        max_per_tile,
+        importance_column,
+        method,
     )
 
 

@@ -1,6 +1,7 @@
 import hashlib
 import random
 import h5py
+import json
 
 from clodius.tiles.utils import tiles_wrapper_1d
 
@@ -91,8 +92,10 @@ def single_chromosome_tile(
     formatted = []
 
     for z, row in items:
-        row = row.decode("utf8")
-        parts = row.split("\t")
+        row = json.loads(row.decode("utf8"))
+
+        parts = row["line"].split("\t")
+        importance = row["importance"]
 
         start = int(parts[1])
         end = int(parts[2])
@@ -105,12 +108,12 @@ def single_chromosome_tile(
             continue
 
         ret = {
-            "uid": hashlib.md5(row.encode("utf-8")).hexdigest(),
+            "uid": hashlib.md5(row["line"].encode("utf-8")).hexdigest(),
             "zoom": z,
             "xStart": css[parts[0]] + int(parts[1]),
             "xEnd": css[parts[0]] + int(parts[2]),
             "chrOffset": css[parts[0]],
-            "importance": random.random(),
+            "importance": importance,
             "fields": parts,
         }
         formatted += [ret]
