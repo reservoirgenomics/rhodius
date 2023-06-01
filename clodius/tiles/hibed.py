@@ -50,25 +50,34 @@ def single_chromosome_tile(
     css = chromsizes.cumsum().shift().fillna(0).to_dict()
     chrom_len = chromsizes.to_dict()[chrom]
 
-    #     print("x", x)
+    # print("max_per_tile", max_per_tile)
+    # print("chrom", chrom, "z", z, "x", x)
     max_width = calc_max_width(chrom_len)
+    # print("max_width:", max_width)
     tile_width = max_width / 2**z
+    # print("tile_width", tile_width)
     tile_start = tile_width * x
     tile_end = tile_width * (x + 1)
     #     print('chromsizes:', chromsizes)
     #     print("max_per_tile:", max_per_tile)
     #     print("sct", z, x)
-
+    # print("tile_start", tile_start / 1e6, tile_end / 1e6)
     items = []
     tile_pos = x
 
-    if str(z) in f:
+    if not chrom in f["values"]:
+        # No entries for this chromosome
+        return []
+
+    if str(z) in f["values"][chrom]:
         # If the requested zoom is higher than the max then we just
         # return the next lowest zoom
         items += [
             (z, x)
             for x in list(
-                f[str(z)][tile_pos * max_per_tile : (tile_pos + 1) * max_per_tile]
+                f["values"][chrom][str(z)][
+                    tile_pos * max_per_tile : (tile_pos + 1) * max_per_tile
+                ]
             )
             if len(x)
         ]
@@ -77,15 +86,15 @@ def single_chromosome_tile(
         z -= 1
         tile_pos //= 2
 
-        # print("z", z, "tile_pos", tile_pos, items)
-
-        if str(z) in f:
+        if str(z) in f["values"][chrom]:
             # If the requested zoom is higher than the max then we just
             # return the next lowest zoom
             items += [
                 (z, x)
                 for x in list(
-                    f[str(z)][tile_pos * max_per_tile : (tile_pos + 1) * max_per_tile]
+                    f["values"][chrom][str(z)][
+                        tile_pos * max_per_tile : (tile_pos + 1) * max_per_tile
+                    ]
                 )
                 if len(x)
             ]
@@ -93,7 +102,7 @@ def single_chromosome_tile(
 
     for z, row in items:
         row = json.loads(row.decode("utf8"))
-
+        # print("row", row["line"])
         parts = row["line"].split("\t")
         importance = row["importance"]
 

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import h5py
 import numpy as np
 import json
+import hashlib
 
 import click
 import clodius.chromosomes as cch
@@ -444,10 +445,6 @@ def bedfile_to_multivec(
     )
 
 
-def chrom_width(chrom, chrom_info):
-    return 2 ** (math.ceil(math.log(chrom_info.chrom_lengths[line[0]]) / math.log(2)))
-
-
 @dataclass
 class ImportanceLine:
     line: List[str]
@@ -460,7 +457,8 @@ def line_tiles(importance_line: ImportanceLine, chrom_info):
     """
     line = importance_line.line
 
-    chrom_len = calc_max_width(chrom_info.chrom_lengths[line[0]])
+    chrom = line[0]
+    chrom_len = calc_max_width(chrom_info.chrom_lengths[chrom])
     interval_len = int(line[2]) - int(line[1])
     zoom_level = math.floor(math.log(chrom_len / interval_len) / math.log(2))
 
@@ -469,9 +467,13 @@ def line_tiles(importance_line: ImportanceLine, chrom_info):
     tile_end = int(line[2]) // tile_size
 
     return [
-        (zoom_level, tile_pos, importance_line.importance, line)
+        (chrom, zoom_level, tile_pos, importance_line.importance, line)
         for tile_pos in range(tile_start, tile_end + 1)
     ]
+
+
+def line_hash(line):
+    return hashlib.md5("\t".join(line).encode("utf8")).hexdigest()
 
 
 def promote_tiles(tiled_lines, max_per_tile=5):
@@ -481,26 +483,45 @@ def promote_tiles(tiled_lines, max_per_tile=5):
     """
     new_tiled_lines = []
     tile_counts = defaultdict(int)
+    tile_hashes = defaultdict(set)
 
-    for zoom_level, tile_pos, importance, line in tiled_lines:
+    for chrom, zoom_level, tile_pos, importance, line in tiled_lines:
+        _line_hash = line_hash(line)
+
+        if zoom_level == 10 and chrom == "chr1":
+            print("##### line", line)
+
         if zoom_level == 0:
             continue
 
         orig_zoom_level = zoom_level
         orig_tile_pos = tile_pos
+        line_found = False
 
         while (
             zoom_level > 0
-            and tile_counts[(zoom_level - 1, tile_pos // 2)] < max_per_tile
+            and tile_counts[(chrom, zoom_level - 1, tile_pos // 2)] < max_per_tile
         ):
             # print("promoting", zoom_level, tile_pos, interval_len, line)
             zoom_level -= 1
             tile_pos //= 2
 
-        new_tiled_lines.append((zoom_level, tile_pos, importance, line))
-        tile_counts[(zoom_level, tile_pos)] += 1
+            if _line_hash in tile_hashes[(chrom, zoom_level, tile_pos)]:
+                # this line is already in a tile
+                line_found = True
+                break
 
-        if tile_counts[(zoom_level, tile_pos)] > max_per_tile:
+        if line_found:
+            continue
+
+        # print(zoom_level, tile_pos, line)
+
+        new_tiled_lines.append((chrom, zoom_level, tile_pos, importance, line))
+
+        tile_counts[(chrom, zoom_level, tile_pos)] += 1
+        tile_hashes[(chrom, zoom_level, tile_pos)].add(_line_hash)
+
+        if tile_counts[(chrom, zoom_level, tile_pos)] > max_per_tile:
             raise ValueError(
                 f"Too many items in this tile: {zoom_level}, {tile_pos}, {tile_counts[(zoom_level, tile_pos)]}"
             )
@@ -508,8 +529,25 @@ def promote_tiles(tiled_lines, max_per_tile=5):
     return new_tiled_lines
 
 
-def dump_chunk_to_file(root, zoom_level, chunk):
+def dump_chunk_to_file(root, chrom, zoom_level, chunk, max_per_tile):
     logger.info(f"========= Dumping chunk: %d", zoom_level)
+
+    if chrom not in root["values"]:
+        root["values"].create_group(chrom)
+
+    if str(zoom_level) not in root["values"][chrom]:
+        logger.info(
+            "Creating new dataset for chrom %s zoom_level %d", chrom, zoom_level
+        )
+        dt = h5py.string_dtype(encoding="utf-8")
+        num_tiles = 2**zoom_level
+        root["values"][chrom].create_dataset(
+            str(zoom_level),
+            shape=(num_tiles * max_per_tile,),
+            dtype=dt,
+            compression="gzip",
+        )
+
     chunk = sorted(chunk)
 
     ixs = [c[0] for c in chunk]
@@ -517,8 +555,9 @@ def dump_chunk_to_file(root, zoom_level, chunk):
 
     # print("tile counts", tile_counts[(zoom_level, 0)])
 
-    # print('zoom_level', zoom_level, 'ixs', ixs)
-    root[str(zoom_level)][ixs] = lines
+    # print("chrom", chrom, "zoom_level", zoom_level, "ixs", ixs)
+    # print("lines", lines)
+    root["values"][chrom][str(zoom_level)][ixs] = lines
 
 
 def _bedfile_to_hibed(
@@ -584,7 +623,7 @@ def _bedfile_to_hibed(
         tiled_lines += line_tiles(importance_line, chrom_info)
 
     new_tiled_lines = promote_tiles(tiled_lines, max_per_tile=max_per_tile)
-    max_zoom_level = max([zoom_level for zoom_level, *_ in new_tiled_lines])
+    max_zoom_level = max([zoom_level for chrom, zoom_level, *_ in new_tiled_lines])
     logger.info("Max zoom: %d", max_zoom_level)
 
     if op.exists(output_file):
@@ -592,47 +631,58 @@ def _bedfile_to_hibed(
 
     root = h5py.File(output_file, mode="w")
     info = root.create_group("info")
+    values = root.create_group("values")
+
     info.attrs["max_per_tile"] = max_per_tile
     info.attrs["max_zoom"] = max_zoom_level
 
-    dt = h5py.string_dtype(encoding="utf-8")
-
-    for zoom_level in range(0, max_zoom_level + 1):
-        num_tiles = 2**zoom_level
-        shape = (num_tiles * max_per_tile,)
-        root.create_dataset(str(zoom_level), shape=shape, dtype=dt, compression="gzip")
-
     tile_counts = defaultdict(int)
 
-    chunk = []
+    chunks = defaultdict(list)
     max_chunk_size = 100
-    prev_zoom_level = None
+    prev_zoom_levels = dict()
 
     new_tiled_lines = sorted(new_tiled_lines)
 
     t1 = time.time()
-    for zoom_level, tile_pos, importance, line in new_tiled_lines:
-        ix = tile_pos * max_per_tile + tile_counts[(zoom_level, tile_pos)]
+    for chrom, zoom_level, tile_pos, importance, line in new_tiled_lines:
+        ix = tile_pos * max_per_tile + tile_counts[(chrom, zoom_level, tile_pos)]
+        # if chrom == "chr1" and zoom_level == 0:
+        #     print(
+        #         "tile_pos", tile_pos, "tc", tile_counts[(chrom, zoom_level, tile_pos)]
+        #     )
 
-        if (zoom_level != prev_zoom_level and prev_zoom_level != None) or len(
-            chunk
-        ) > max_chunk_size:
-            dump_chunk_to_file(root, prev_zoom_level, chunk)
-            chunk = []
+        if (
+            "chrom" in prev_zoom_levels and zoom_level != prev_zoom_levels[chrom]
+        ) or len(chunks[chrom]) > max_chunk_size:
+            dump_chunk_to_file(
+                root,
+                chrom,
+                prev_zoom_levels[chrom],
+                chunks[chrom],
+                max_per_tile=max_per_tile,
+            )
+            chunks[chrom] = []
 
         # print("zoom_level", zoom_level, "tile_pos", tile_pos, "line", line)
-        if tile_counts[(zoom_level, tile_pos)] == max_per_tile:
+        if tile_counts[(chrom, zoom_level, tile_pos)] == max_per_tile:
             raise ValueError(
-                f"Too many items in this tile: {zoom_level}, {tile_pos}, {tile_counts[(zoom_level, tile_pos)]}"
+                f"Too many items in this tile: {chrom}, {zoom_level}, {tile_pos}, {tile_counts[(chrom, zoom_level, tile_pos)]}"
             )
 
         # print("adding", zoom_level, tile_pos, ix)
-        chunk += [(ix, json.dumps({"importance": importance, "line": "\t".join(line)}))]
-        tile_counts[(zoom_level, tile_pos)] += 1
-        prev_zoom_level = zoom_level
+        chunks[chrom] += [
+            (ix, json.dumps({"importance": importance, "line": "\t".join(line)}))
+        ]
+        tile_counts[(chrom, zoom_level, tile_pos)] += 1
+        prev_zoom_levels[chrom] = zoom_level
 
     # print("adding last chunk", prev_zoom_level, chunk)
-    dump_chunk_to_file(root, prev_zoom_level, chunk)
+    for chrom in chrom_names:
+        if chrom in prev_zoom_levels:
+            dump_chunk_to_file(
+                root, chrom, prev_zoom_levels[chrom], chunks[chrom], max_per_tile
+            )
 
     logger.info("Finished writing to file: %f", time.time() - t1)
 
