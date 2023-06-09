@@ -34,7 +34,7 @@ def get_quadtree_depth(chromsizes):
 
 
 def get_zoom_resolutions(chromsizes):
-    return [2 ** x for x in range(get_quadtree_depth(chromsizes) + 1)][::-1]
+    return [2**x for x in range(get_quadtree_depth(chromsizes) + 1)][::-1]
 
 
 def natsort_key(s, _NS_REGEX=re.compile(r"(\d+)", re.U)):
@@ -139,7 +139,7 @@ def tileset_info(bwpath, chromsizes=None):
         chromsizes = get_chromsizes(bwpath)
         chromsizes_list = []
 
-        for chrom, size in chromsizes.iteritems():
+        for chrom, size in chromsizes.items():
             chromsizes_list += [[chrom, int(size)]]
     else:
         chromsizes_list = chromsizes
@@ -149,8 +149,8 @@ def tileset_info(bwpath, chromsizes=None):
 
     tileset_info = {
         "min_pos": [0],
-        "max_pos": [TILE_SIZE * 2 ** max_zoom],
-        "max_width": TILE_SIZE * 2 ** max_zoom,
+        "max_pos": [TILE_SIZE * 2**max_zoom],
+        "max_width": TILE_SIZE * 2**max_zoom,
         "tile_size": TILE_SIZE,
         "max_zoom": max_zoom,
         "chromsizes": chromsizes_list,
@@ -244,7 +244,7 @@ def get_bigwig_tile(
 
     new_arrays = []
 
-    for ((cid, start, end), x) in zip(cids_starts_ends, arrays):
+    for (cid, start, end), x in zip(cids_starts_ends, arrays):
         current_data_position += end - start
 
         start_pos = math.floor(start / binsize)
@@ -368,7 +368,7 @@ def chromsizes(filename):
     try:
         chrom_series = get_chromsizes(filename)
         data = []
-        for chrom, size in chrom_series.iteritems():
+        for chrom, size in chrom_series.items():
             data.append([chrom, size])
         return data
     except Exception as ex:

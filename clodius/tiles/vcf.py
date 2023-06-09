@@ -17,19 +17,14 @@ def grouper(n, iterable):
             return
         yield chunk
 
-def generic_regions(fetcher,offset, limit):
+
+def generic_regions(fetcher, offset, limit):
     if offset:
         for i in range(offset):
             try:
                 next(fetcher)
             except StopIteration:
-                return {
-                    "offset": offset,
-                    "limit": limit,
-                    "results": [],
-                    "next": False
-                }
-
+                return {"offset": offset, "limit": limit, "results": [], "next": False}
 
     curr_page = next(grouper(limit, fetcher))
 
@@ -43,6 +38,7 @@ def generic_regions(fetcher,offset, limit):
     ret = curr_page
 
     return (ret, next_page)
+
 
 def regions(filename, chromsizes, offset, limit):
     """Return a list of regions in the range.
@@ -87,7 +83,7 @@ def tileset_info(filename, chromsizes):
     # do this so that we can serialize the int64s in the numpy array
     chromsizes_list = []
 
-    for chrom, size in chromsizes.iteritems():
+    for chrom, size in chromsizes.items():
         chromsizes_list += [[chrom, int(size)]]
 
     max_width = sum([c[1] for c in chromsizes_list])
@@ -126,15 +122,15 @@ def single_tile(
     filename, index_filename, chromsizes, tsinfo, z, x, max_tile_width, tbx_index=None
 ):
     # TODO: replace this function with the one in clodius.tiles.tabix
-    tile_width = tsinfo["max_width"] / 2 ** z
+    tile_width = tsinfo["max_width"] / 2**z
 
     if max_tile_width and tile_width > max_tile_width:
         return {"error": "Tile too wide"}
 
     query_size = 0
 
-    start_pos = x * tsinfo["max_width"] / 2 ** z
-    end_pos = (x + 1) * tsinfo["max_width"] / 2 ** z
+    start_pos = x * tsinfo["max_width"] / 2**z
+    end_pos = (x + 1) * tsinfo["max_width"] / 2**z
 
     css = chromsizes.cumsum().shift().fillna(0).to_dict()
 
@@ -146,7 +142,7 @@ def single_tile(
     ret_vals = []
 
     if tbx_index:
-        for (cid, start, end) in cids_starts_ends:
+        for cid, start, end in cids_starts_ends:
             chrom = chromsizes.index[cid]
 
             query_size += rtt.est_query_size(tbx_index, chrom, int(start), int(end))
@@ -156,7 +152,7 @@ def single_tile(
     if query_size > MAX_QUERY_SIZE:
         return {"error": f"Tile too large {query_size}"}
 
-    for (cid, start, end) in cids_starts_ends:
+    for cid, start, end in cids_starts_ends:
         chrom = chromsizes.index[cid]
         ret_vals += [
             {

@@ -67,7 +67,7 @@ def load_reads(
     chromsize: pandas.Series
         A listing of chromosome sizes. If not provided, the chromosome
         list will be extracted from the the bam file header
-    cache: 
+    cache:
         An object that implements the `get`, `set` and `exists` methods
         for caching data
 
@@ -82,7 +82,7 @@ def load_reads(
     if chromsizes is not None:
         chromsizes_list = []
 
-        for chrom, size in chromsizes.iteritems():
+        for chrom, size in chromsizes.items():
             chromsizes_list += [[chrom, int(size)]]
     else:
         references = np.array(samfile.references)
@@ -273,7 +273,7 @@ def alignment_tileset_info(samfile, chromsizes):
     if chromsizes is not None:
         chromsizes_list = []
 
-        for chrom, size in chromsizes.iteritems():
+        for chrom, size in chromsizes.items():
             chromsizes_list += [[chrom, int(size)]]
 
         total_length = sum([c[1] for c in chromsizes_list])
@@ -298,7 +298,7 @@ def alignment_tileset_info(samfile, chromsizes):
     tileset_info = {
         "min_pos": [0],
         "max_pos": [total_length],
-        "max_width": tile_size * 2 ** max_zoom,
+        "max_width": tile_size * 2**max_zoom,
         "tile_size": tile_size,
         "chromsizes": chromsizes_list,
         "max_zoom": max_zoom,
@@ -331,7 +331,7 @@ def alignment_tiles(
     max_tile_width: int
         How wide can each tile be before we return no data. This
         can be used to limit the amount of data returned.
-    cache: 
+    cache:
         An object that implements the `get`, `set` and `exists` methods
         for caching data
     Returns

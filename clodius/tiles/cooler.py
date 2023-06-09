@@ -188,7 +188,7 @@ def _get_info_multi_v1(file_path):
         max_zoom = f.attrs["max-zoom"]
         bin_size = int(f[str(max_zoom)].attrs["bin-size"])
 
-        max_width = bin_size * TILE_SIZE * 2 ** max_zoom
+        max_width = bin_size * TILE_SIZE * 2**max_zoom
 
         # the list of available data transforms
         transforms = {}
@@ -231,7 +231,7 @@ def get_quadtree_depth(chromsizes, binsize):
 
 def get_zoom_resolutions(chromsizes, base_res):
     return [
-        base_res * 2 ** x for x in range(get_quadtree_depth(chromsizes, base_res) + 1)
+        base_res * 2**x for x in range(get_quadtree_depth(chromsizes, base_res) + 1)
     ]
 
 
@@ -320,7 +320,6 @@ def make_tiles(
 
     for x_offset in range(0, x_width):
         for y_offset in range(0, y_width):
-
             start1 = (x_pos + x_offset) * tile_size
             end1 = (x_pos + x_offset + 1) * tile_size
             start2 = (y_pos + y_offset) * tile_size
@@ -514,7 +513,7 @@ def make_mats(filepath):
         info["min_pos"] = [1, 1]
 
         c = cooler.Cooler(f["resolutions"][resolution])
-        info["chromsizes"] = [[x[0], int(x[1])] for x in c.chromsizes.iteritems()]
+        info["chromsizes"] = [[x[0], int(x[1])] for x in c.chromsizes.items()]
         if "storage-mode" in c.info and c.info["storage-mode"] == "square":
             info["mirror_tiles"] = "false"
     else:
@@ -522,7 +521,7 @@ def make_mats(filepath):
 
         c = cooler.Cooler(f["0"])
 
-        info["chromsizes"] = [[x[0], int(x[1])] for x in c.chromsizes.iteritems()]
+        info["chromsizes"] = [[x[0], int(x[1])] for x in c.chromsizes.items()]
         info["min_pos"] = [int(m) for m in info["min_pos"]]
         info["max_pos"] = [int(m) for m in info["max_pos"]]
         info["max_zoom"] = int(info["max_zoom"])
@@ -585,8 +584,7 @@ def add_transform_type(tile_id):
 
 
 def tiles(filepath, tile_ids):
-    """
-    """
+    """ """
     transform_id_to_original_id = {}
 
     new_tile_ids = []
@@ -667,7 +665,7 @@ def generate_tiles(filepath, tile_ids):
                 # this tile has too high of a zoom level specified
                 continue
             hdf_for_resolution = tileset_file[str(zoom_level)]
-            resolution = (tileset_info["max_width"] / 2 ** zoom_level) / BINS_PER_TILE
+            resolution = (tileset_info["max_width"] / 2**zoom_level) / BINS_PER_TILE
 
         tile_positions = [[int(x) for x in t.split(".")[2:4]] for t in tile_group]
 

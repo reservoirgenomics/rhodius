@@ -27,7 +27,7 @@ def tileset_info(filename, chromsizes):
     max_zoom = math.ceil(math.log(sum(chromsizes)) / math.log(2))
     max_width = 2**max_zoom
 
-    chromsizes_list = [[chrom, int(size)] for chrom, size in chromsizes.iteritems()]
+    chromsizes_list = [[chrom, int(size)] for chrom, size in chromsizes.items()]
 
     with h5py.File(filename, "r") as f:
         max_per_tile = f["info"].attrs["max_per_tile"]

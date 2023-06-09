@@ -60,7 +60,7 @@ def tileset_info(filename, chromsizes=None, index_filename=None):
     if chromsizes is None:
         return {"error": "No chromsizes found. Make sure the assembly: tag is set"}
 
-    for chrom, size in chromsizes.iteritems():
+    for chrom, size in chromsizes.items():
         chromsizes_list += [[chrom, int(size)]]
 
     max_width = sum([c[1] for c in chromsizes_list])
@@ -214,8 +214,8 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
     orig_columns = val["orig_columns"]
     css = val["css"]
 
-    tileStart = x * tsinfo["max_width"] / 2 ** z
-    tileEnd = (x + 1) * tsinfo["max_width"] / 2 ** z
+    tileStart = x * tsinfo["max_width"] / 2**z
+    tileEnd = (x + 1) * tsinfo["max_width"] / 2**z
 
     t = t.query(f"xEnd >= {tileStart} & xStart <= {tileEnd}")
     MAX_PER_TILE = settings.get("MAX_BEDFILE_ENTRIES") or 1024

@@ -104,7 +104,7 @@ def tileset_info(filename, chromsizes=None):
     if chromsizes is None:
         return {"error": "No chromsizes found. Make sure the assembly: tag is set"}
 
-    for chrom, size in chromsizes.iteritems():
+    for chrom, size in chromsizes.items():
         chromsizes_list += [[chrom, int(size)]]
 
     max_width = sum([c[1] for c in chromsizes_list])
@@ -219,11 +219,11 @@ def single_2d_tile(filename, chromsizes, tsinfo, z, x, y):
     orig_columns = val["orig_columns"]
     css = val["css"]
 
-    xTileStart = x * tsinfo["max_width"] / 2 ** z
-    xTileEnd = (x + 1) * tsinfo["max_width"] / 2 ** z
+    xTileStart = x * tsinfo["max_width"] / 2**z
+    xTileEnd = (x + 1) * tsinfo["max_width"] / 2**z
 
-    yTileStart = y * tsinfo["max_width"] / 2 ** z
-    yTileEnd = (y + 1) * tsinfo["max_width"] / 2 ** z
+    yTileStart = y * tsinfo["max_width"] / 2**z
+    yTileEnd = (y + 1) * tsinfo["max_width"] / 2**z
 
     t = t.query(
         f"xEnd >= {xTileStart} & xStart <= {xTileEnd} & "
@@ -246,8 +246,8 @@ def single_1d_tile(filename, chromsizes, tsinfo, z, x):
     orig_columns = val["orig_columns"]
     css = val["css"]
 
-    xTileStart = x * tsinfo["max_width"] / 2 ** z
-    xTileEnd = (x + 1) * tsinfo["max_width"] / 2 ** z
+    xTileStart = x * tsinfo["max_width"] / 2**z
+    xTileEnd = (x + 1) * tsinfo["max_width"] / 2**z
 
     t = t.query(
         f"xEnd >= {xTileStart} & xStart <= {xTileEnd} | "
