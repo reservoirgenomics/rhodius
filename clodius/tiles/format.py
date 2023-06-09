@@ -1,5 +1,6 @@
 import base64
 import numpy as np
+import warnings
 
 
 def format_dense_tile(data):
@@ -22,8 +23,8 @@ def format_dense_tile(data):
     tile_data = {}
 
     if len(data):
-        with np.warnings.catch_warnings():
-            np.warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", r"All-NaN (slice|axis) encountered")
 
             max_dense = float(np.nanmax(data))
             min_dense = float(np.nanmin(data))
