@@ -6,8 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pandas as pd
+import pybigtools
 
-import bbi
 import clodius.tiles.format as hgfo
 
 MAX_THREADS = 4
@@ -92,7 +92,8 @@ def get_chromsizes(bwpath):
     Also, return NaNs from any missing chromosomes in bbi.fetch
 
     """
-    chromsizes = bbi.chromsizes(bwpath)
+    f = pybigtools.open(bwpath)
+    chromsizes = f.chroms()
     chromosomes = natsorted(chromsizes.keys())
     chrom_series = pd.Series(chromsizes)[chromosomes]
     return chrom_series
@@ -171,27 +172,33 @@ def fetch_data(a):
     if range_mode == "whisker":
         n_dim = 4
 
+    # print("bwpath", bwpath)
     x = np.zeros((n_bins, n_dim)) if n_dim > 1 else np.zeros(n_bins)
+
+    if not isinstance(bwpath, str):
+        bwpath.seek(0)
+
+    b = pybigtools.open(bwpath)
 
     try:
         chrom = chromsizes.index[cid]
         clen = chromsizes.values[cid]
 
-        args = [bwpath, chrom, start, end]
-        kwargs = {"bins": n_bins, "missing": np.nan}
+        args = [str(chrom), int(start), int(end), n_bins]
 
         if range_mode == "minMax":
-            x[:, 0] = bbi.fetch(*args, **dict(kwargs, summary="min"))
-            x[:, 1] = bbi.fetch(*args, **dict(kwargs, summary="max"))
+            x[:, 0] = b.values(*args, "min")
+            x[:, 1] = b.values(*args, "max")
 
         elif range_mode == "whisker":
-            x[:, 0] = bbi.fetch(*args, **dict(kwargs, summary="min"))
-            x[:, 1] = bbi.fetch(*args, **dict(kwargs, summary="max"))
-            x[:, 2] = bbi.fetch(*args, **dict(kwargs, summary="mean"))
-            x[:, 3] = bbi.fetch(*args, **dict(kwargs, summary="std"))
+            x[:, 0] = b.values(*args, "min")
+            x[:, 1] = b.values(*args, "max")
+            x[:, 2] = b.values(*args, "mean")
+            x[:, 3] = b.values(*args, "std")
 
         else:
-            x[:] = bbi.fetch(*args, **dict(kwargs, summary=aggregation_mode))
+            # print("args", [a for a in args], "aggregation_mode", aggregation_mode)
+            x[:] = b.values(*args, aggregation_mode)
 
         # the following is commented out because it is handled in get_bigwig_tile
         # # drop the very last bin if it is smaller than the binsize
@@ -225,19 +232,25 @@ def get_bigwig_tile(
     binsize = resolutions[zoom_level]
 
     cids_starts_ends = list(abs2genomic(chromsizes, start_pos, end_pos))
-    with ThreadPoolExecutor(max_workers=16) as e:
-        arrays = list(
-            e.map(
-                fetch_data,
-                [
-                    tuple(
-                        [bwpath, binsize, chromsizes, aggregation_mode, range_mode]
-                        + list(c)
-                    )
-                    for c in cids_starts_ends
-                ],
-            )
+    arrays = [
+        fetch_data(
+            tuple([bwpath, binsize, chromsizes, aggregation_mode, range_mode] + list(c))
         )
+        for c in cids_starts_ends
+    ]
+    # with ThreadPoolExecutor(max_workers=1) as e:
+    #     arrays = list(
+    #         e.map(
+    #             fetch_data,
+    #             [
+    #                 tuple(
+    #                     [bwpath, binsize, chromsizes, aggregation_mode, range_mode]
+    #                     + list(c)
+    #                )
+    #                 for c in cids_starts_ends
+    #             ],
+    #         )
+    #     )
 
     current_data_position = 0
     current_binned_data_position = 0

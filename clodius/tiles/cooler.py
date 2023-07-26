@@ -479,6 +479,7 @@ def make_mats(filepath):
     Create the file handle and tileset info for a cooler
     tileset
     """
+    print("make_mats", filepath)
     f = h5py.File(filepath, "r")
 
     if "resolutions" in f:
