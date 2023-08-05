@@ -1,13 +1,21 @@
 import sqlite3
 
+import s3fs
+import s3sqlite
+import apsw
+
+sovfs = s3sqlite.SmartOpenVFS(name="so-vfs")
+
 
 def tileset_info(db_file):
-    conn = sqlite3.connect(db_file)
-    cursor = conn.cursor()
+    with apsw.Connection(
+        db_file, vfs=sovfs.name, flags=apsw.SQLITE_OPEN_READONLY
+    ) as conn:
+        cursor = conn.cursor()
 
-    row = cursor.execute("SELECT * from tileset_info").fetchone()
+        row = cursor.execute("SELECT * from tileset_info").fetchone()
 
-    colnames = next(zip(*cursor.description))
+        colnames = next(zip(*cursor.description))
 
     if "version" not in colnames:
         version = 1
@@ -72,10 +80,10 @@ def tiles(filepath, tile_ids):
         new_rows = {}
         new_rows = []
 
-        for j in range(2 ** extra_zoom):
+        for j in range(2**extra_zoom):
             # the old rows are indexed by the higher
             # resolution tile numbers
-            higher_xpos = 2 ** extra_zoom * xpos + j
+            higher_xpos = 2**extra_zoom * xpos + j
             old_rows = get_1D_tiles(filepath, zoom + extra_zoom, higher_xpos)
             new_rows += old_rows
 
@@ -108,66 +116,67 @@ def get_1D_tiles(db_file, zoom, tile_x_pos, num_tiles=1):
     ts_info = tileset_info(db_file)
     version = ts_info["version"]
 
-    conn = sqlite3.connect(db_file)
+    with apsw.Connection(
+        db_file, vfs=sovfs.name, flags=apsw.SQLITE_OPEN_READONLY
+    ) as conn:
+        c = conn.cursor()
 
-    c = conn.cursor()
+        tile_width = ts_info["max_width"] / 2**zoom
 
-    tile_width = ts_info["max_width"] / 2 ** zoom
+        tile_start_pos = tile_width * tile_x_pos
+        tile_end_pos = tile_start_pos + num_tiles * tile_width
 
-    tile_start_pos = tile_width * tile_x_pos
-    tile_end_pos = tile_start_pos + num_tiles * tile_width
-
-    query = """
-    SELECT startPos, endPos, chrOffset, importance, fields, uid
-    FROM intervals,position_index
-    WHERE
-        intervals.id=position_index.id AND
-        zoomLevel <= {} AND
-        rEndPos >= {} AND
-        rStartPos <= {}
-    """.format(
-        zoom, tile_start_pos, tile_end_pos
-    )
-
-    if version == 2:
         query = """
         SELECT startPos, endPos, chrOffset, importance, fields, uid
         FROM intervals,position_index
         WHERE
             intervals.id=position_index.id AND
-            rStartZoomLevel <= {} AND
-            rEndZoomLevel >= 0 AND
+            zoomLevel <= {} AND
             rEndPos >= {} AND
             rStartPos <= {}
         """.format(
             zoom, tile_start_pos, tile_end_pos
         )
 
-    if version == 3:
-        query = """
-        SELECT startPos, endPos, chrOffset, importance, fields, uid, name
-        FROM intervals,position_index
-        WHERE
-            intervals.id=position_index.id AND
-            rStartZoomLevel <= {} AND
-            rEndZoomLevel >= 0 AND
-            rEndPos >= {} AND
-            rStartPos <= {}
-        """.format(
-            zoom, tile_start_pos, tile_end_pos
-        )
+        if version == 2:
+            query = """
+            SELECT startPos, endPos, chrOffset, importance, fields, uid
+            FROM intervals,position_index
+            WHERE
+                intervals.id=position_index.id AND
+                rStartZoomLevel <= {} AND
+                rEndZoomLevel >= 0 AND
+                rEndPos >= {} AND
+                rStartPos <= {}
+            """.format(
+                zoom, tile_start_pos, tile_end_pos
+            )
 
-    if version == "3t":
-        tile_id = sum([2 ** x for x in range(zoom)]) + tile_x_pos
-        query = f"""
-        SELECT startPos, endPos, chrOffset, importance, fields, uid, name
-        FROM intervals, tiles
-        WHERE
-            tiles.id = {tile_id} AND
-            tiles.intervalId = intervals.id
-        """
+        if version == 3:
+            query = """
+            SELECT startPos, endPos, chrOffset, importance, fields, uid, name
+            FROM intervals,position_index
+            WHERE
+                intervals.id=position_index.id AND
+                rStartZoomLevel <= {} AND
+                rEndZoomLevel >= 0 AND
+                rEndPos >= {} AND
+                rStartPos <= {}
+            """.format(
+                zoom, tile_start_pos, tile_end_pos
+            )
 
-    rows = c.execute(query).fetchall()
+        if version == "3t":
+            tile_id = sum([2**x for x in range(zoom)]) + tile_x_pos
+            query = f"""
+            SELECT startPos, endPos, chrOffset, importance, fields, uid, name
+            FROM intervals, tiles
+            WHERE
+                tiles.id = {tile_id} AND
+                tiles.intervalId = intervals.id
+            """
+
+        rows = c.execute(query).fetchall()
 
     new_rows = []
 
@@ -198,7 +207,6 @@ def get_1D_tiles(db_file, zoom, tile_x_pos, num_tiles=1):
                     to_add["name"] = r[6]
 
                 new_rows += [to_add]
-    conn.close()
 
     return new_rows
 
