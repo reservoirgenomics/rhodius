@@ -4,9 +4,11 @@ import math
 import numpy as np
 
 import clodius.tiles.bigwig as ctbw
-import pysam
 from clodius.tiles.tabix import est_query_size_ix, load_bai_index
 from clodius.tiles.utils import abs2genomic
+
+import oxbow as ox
+import polars as pl
 
 
 def get_cigar_substitutions(read):
@@ -49,17 +51,15 @@ def get_cigar_substitutions(read):
     return subs
 
 
-def load_reads(
-    samfile, start_pos, end_pos, chromsizes=None, index_filename=None, cache=None
-):
+def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache=None):
     """
     Sample reads from the specified region, assuming that the chromosomes
     are ordered in some fashion. Returns an list of pysam reads
 
     Parameters:
     -----------
-    samfile: pysam.AlignmentFile
-        A pysam entry into an indexed bam file
+    file: file-like
+        The opened BAM file
     start_pos: int
         The start position of the sampled region
     end_pos: int
@@ -67,6 +67,8 @@ def load_reads(
     chromsize: pandas.Series
         A listing of chromosome sizes. If not provided, the chromosome
         list will be extracted from the the bam file header
+    index_file: file-like
+        The index file
     cache:
         An object that implements the `get`, `set` and `exists` methods
         for caching data
@@ -85,8 +87,11 @@ def load_reads(
         for chrom, size in chromsizes.items():
             chromsizes_list += [[chrom, int(size)]]
     else:
-        references = np.array(samfile.references)
-        lengths = np.array(samfile.lengths)
+        file.seek(0)
+        ipc = ox.read_bam_references(file)
+        chroms = pl.read_ipc(ipc)
+        references = np.array(chroms["name"])
+        lengths = np.array(chroms["length"])
 
         ref_lengths = dict(zip(references, lengths))
 
@@ -97,6 +102,7 @@ def load_reads(
         chromsizes_list = list(zip(references, [int(l) for l in lengths]))
 
     lengths = [r[1] for r in chromsizes_list]
+
     abs_chrom_offsets = np.r_[0, np.cumsum(lengths)]
 
     results = {
@@ -121,12 +127,15 @@ def load_reads(
     strands = {True: "-", False: "+"}
     import time
 
-    idx = load_bai_index(index_filename)
+    index_file.seek(0)
+    idx = load_bai_index(index_file)
 
     total_size = 0
     # check the size of the file to load to get an approximation
     # of whether we're going to return too much data
     for cid, start, end in abs2genomic(lengths, start_pos, end_pos):
+        if cid >= len(chromsizes_list):
+            continue
         total_size += est_query_size_ix(idx[cid], start, end)
 
     MAX_SIZE = 4e6
@@ -140,7 +149,21 @@ def load_reads(
             continue
 
         seq_name = f"{chromsizes_list[cid][0]}"
-        reads = samfile.fetch(seq_name, start, end)
+        if start == 0:
+            start = 1
+
+        file.seek(0)
+        index_file.seek(0)
+        ipc = ox.read_bam(file, f"{seq_name}:{start}-{end}", index=index_file)
+        reads_df = pl.read_ipc(ipc)
+
+        return reads_df
+
+        reads_df["is_paired"] = reads_df["flag"] & 1
+
+        print(reads_df["is_paired"].head())
+        1 / 0
+
         for read in reads:
             if read.is_unmapped:
                 continue
@@ -253,7 +276,7 @@ def set_cached_variants(cache, read_id, variants):
         cache.set(cache_id, json.dumps(variants))
 
 
-def alignment_tileset_info(samfile, chromsizes):
+def alignment_tileset_info(file, chromsizes):
     """
     Get the tileset info for a bam file
 
@@ -278,10 +301,13 @@ def alignment_tileset_info(samfile, chromsizes):
 
         total_length = sum([c[1] for c in chromsizes_list])
     else:
-        total_length = sum(samfile.lengths)
+        file.seek(0)
+        ipc = ox.read_bam_references(file)
+        chroms = pl.read_ipc(ipc)
+        total_length = sum(chroms["length"])
 
-        references = np.array(samfile.references)
-        lengths = np.array(samfile.lengths)
+        references = np.array(chroms["name"])
+        lengths = np.array(chroms["length"])
 
         ref_lengths = dict(zip(references, lengths))
         references = ctbw.natsorted(references)
@@ -309,9 +335,9 @@ def alignment_tileset_info(samfile, chromsizes):
 
 
 def alignment_tiles(
-    samfile,
+    file,
     tile_ids,
-    index_filename=None,
+    index_file=None,
     chromsizes=None,
     max_tile_width=None,
     cache=None,
@@ -340,13 +366,13 @@ def alignment_tiles(
         A list of tile_id, tile_data tuples
     """
     generated_tiles = []
-    tsinfo = alignment_tileset_info(samfile, chromsizes)
+    tsinfo = alignment_tileset_info(file, chromsizes)
 
     for tile_id in tile_ids:
         tile_id_parts = tile_id.split("|")[0].split(".")
         tile_position = list(map(int, tile_id_parts[1:3]))
 
-        tile_width = tsinfo["max_width"] / 2 ** int(tile_position[0])
+        tile_width = tsinfo["max_width"] // 2 ** int(tile_position[0])
 
         if max_tile_width and tile_width >= max_tile_width:
             # this tile is larger than the max allowed
@@ -363,11 +389,11 @@ def alignment_tiles(
             end_pos = start_pos + tile_width
 
             tile_value = load_reads(
-                samfile,
+                file,
                 start_pos=start_pos,
                 end_pos=end_pos,
                 chromsizes=chromsizes,
-                index_filename=index_filename,
+                index_file=index_file,
                 cache=cache,
             )
             generated_tiles += [(tile_id, tile_value)]
@@ -375,26 +401,22 @@ def alignment_tiles(
     return generated_tiles
 
 
-def tileset_info(filename, chromsizes=None):
-    samfile = pysam.AlignmentFile(filename)
-
-    return alignment_tileset_info(samfile, chromsizes)
+def tileset_info(file, chromsizes=None):
+    return alignment_tileset_info(file, chromsizes)
 
 
 def tiles(
-    filename,
+    file,
     tile_ids,
-    index_filename=None,
+    index_file=None,
     chromsizes=None,
     max_tile_width=None,
     cache=None,
 ):
-    samfile = pysam.AlignmentFile(filename, index_filename=index_filename)
-
     return alignment_tiles(
-        samfile,
+        file,
         tile_ids,
-        index_filename=index_filename,
+        index_file=index_file,
         chromsizes=chromsizes,
         max_tile_width=None,
         cache=cache,

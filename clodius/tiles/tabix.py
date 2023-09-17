@@ -9,37 +9,39 @@ import numpy as np
 from clodius.tiles.bigwig import abs2genomic
 
 
-def load_bai_index(index_filename):
+def load_bai_index(index_file):
     """Load a reduced version of a bai index so that we can
     go through it and get a sense of how much data will be
     retrieved by a query."""
-    with open(index_filename, "rb") as f:
-        b = bytearray(f.read())
+    f = index_file
+    b = bytearray(f.read())
 
-        [_, _, _, _, n_ref] = struct.unpack("<4cI", b[:8])
-        c = 8
+    print("len(b)", len(b))
 
-        indeces = []
+    [_, _, _, _, n_ref] = struct.unpack("<4cI", b[:8])
+    c = 8
 
-        for i in range(n_ref):
-            n_bin = struct.unpack("<I", b[c : c + 4])[0]
-            c += 4
-            bins = col.defaultdict(list)
-            for j in range(n_bin):
-                [bin_no, n_chunk] = struct.unpack("<II", b[c : c + 8])
-                c += 8
+    indeces = []
 
-                bytes_to_read = n_chunk * 2 * 8
-                unpack_str = f"<{2 * n_chunk}Q"
-                bins[bin_no] = struct.unpack(unpack_str, b[c : c + bytes_to_read])
-                c += bytes_to_read
+    for i in range(n_ref):
+        n_bin = struct.unpack("<I", b[c : c + 4])[0]
+        c += 4
+        bins = col.defaultdict(list)
+        for j in range(n_bin):
+            [bin_no, n_chunk] = struct.unpack("<II", b[c : c + 8])
+            c += 8
 
-            n_intv = struct.unpack("<I", b[c : c + 4])[0]
-            c += 4 + 8 * n_intv
+            bytes_to_read = n_chunk * 2 * 8
+            unpack_str = f"<{2 * n_chunk}Q"
+            bins[bin_no] = struct.unpack(unpack_str, b[c : c + bytes_to_read])
+            c += bytes_to_read
 
-            indeces += [bins]
+        n_intv = struct.unpack("<I", b[c : c + 4])[0]
+        c += 4 + 8 * n_intv
 
-        return indeces
+        indeces += [bins]
+
+    return indeces
 
 
 def load_tbi_idx(index_filename):
@@ -117,6 +119,8 @@ def reg2bins(begin, end, n_lvls=5, min_shift=14):
     -------
     generator
     """
+    print("begin", begin)
+    print("end", end)
     begin, end = begin, end
     t, s = 0, min_shift + (n_lvls << 1) + n_lvls
     for l in range(n_lvls + 1):
@@ -168,15 +172,15 @@ def single_indexed_tile(
     if max_results is None:
         max_results = 2048
 
-    tile_width = tsinfo["max_width"] / 2 ** z
+    tile_width = tsinfo["max_width"] / 2**z
 
     if max_tile_width and tile_width > max_tile_width:
         return {"error": "Tile too wide"}
 
     query_size = 0
 
-    start_pos = x * tsinfo["max_width"] / 2 ** z
-    end_pos = (x + 1) * tsinfo["max_width"] / 2 ** z
+    start_pos = x * tsinfo["max_width"] / 2**z
+    end_pos = (x + 1) * tsinfo["max_width"] / 2**z
 
     css = chromsizes.cumsum().shift().fillna(0).to_dict()
 
@@ -184,7 +188,7 @@ def single_indexed_tile(
     ret_vals = []
 
     if tbx_index:
-        for (cid, start, end) in cids_starts_ends:
+        for cid, start, end in cids_starts_ends:
             if cid >= len(chromsizes):
                 continue
 
@@ -197,7 +201,7 @@ def single_indexed_tile(
     if query_size > MAX_QUERY_SIZE:
         return {"error": f"Tile too large {query_size}"}
 
-    for (cid, start, end) in cids_starts_ends:
+    for cid, start, end in cids_starts_ends:
         if cid >= len(chromsizes):
             continue
 
