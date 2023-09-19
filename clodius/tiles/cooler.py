@@ -291,8 +291,6 @@ def make_tiles(
     # print("resolution:", resolution)
     # print("tile_size:", tile_size)
     # print("transform_type:", transform_type);
-    # print('start1:', start1, end1)
-    # print('start2:', start2, end2)
 
     c = cooler.Cooler(hdf_for_resolution)
     (chroms, chrom_sizes, chrom_cum_lengths) = get_chromosome_names_cumul_lengths(c)
@@ -328,8 +326,8 @@ def make_tiles(
             # print("resolution:", resolution)
             # print("tile_size", tile_size)
             # print("x_pos:", x_pos, "x_offset", x_offset)
-            # print("start1", start1, 'end1', end1)
-            # print("start2", start2, 'end2', end2)
+            # print("start1", start1, "end1", end1)
+            # print("start2", start2, "end2", end2)
 
             df = data[data["genome_start1"] >= start1]
             df = df[df["genome_start1"] < end1]
@@ -341,6 +339,10 @@ def make_tiles(
 
             j = ((df["genome_start1"].values - start1) // binsize).astype(int)
             i = ((df["genome_start2"].values - start2) // binsize).astype(int)
+
+            # print("df", df) 
+            # print("j", j)
+            # print("i", i)
 
             if "balanced" in df:
                 v = np.nan_to_num(df["balanced"].values)

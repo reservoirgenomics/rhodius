@@ -230,7 +230,6 @@ def get_bigwig_tile(
 
     resolutions = get_zoom_resolutions(chromsizes)
     binsize = resolutions[zoom_level]
-
     cids_starts_ends = list(abs2genomic(chromsizes, start_pos, end_pos))
     arrays = [
         fetch_data(

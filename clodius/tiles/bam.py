@@ -154,7 +154,9 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
 
         file.seek(0)
         index_file.seek(0)
-        ipc = ox.read_bam(file, f"{seq_name}:{start}-{end}", index=index_file)
+        ipc = ox.read_bam(
+            file, f"{seq_name}:{start}-{end}", index=index_file, tags=set(["MD", "HP"])
+        )
         reads_df = pl.read_ipc(ipc)
 
         return reads_df
