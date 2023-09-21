@@ -16,8 +16,6 @@ def load_bai_index(index_file):
     f = index_file
     b = bytearray(f.read())
 
-    print("len(b)", len(b))
-
     [_, _, _, _, n_ref] = struct.unpack("<4cI", b[:8])
     c = 8
 
@@ -119,8 +117,6 @@ def reg2bins(begin, end, n_lvls=5, min_shift=14):
     -------
     generator
     """
-    print("begin", begin)
-    print("end", end)
     begin, end = begin, end
     t, s = 0, min_shift + (n_lvls << 1) + n_lvls
     for l in range(n_lvls + 1):

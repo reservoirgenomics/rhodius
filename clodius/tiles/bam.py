@@ -11,44 +11,179 @@ import oxbow as ox
 import polars as pl
 
 
-def get_cigar_substitutions(read):
+def get_cigar_substitutions(pos, query_length, cigartuples):
     subs = []
     curr_pos = 0
 
-    cigartuples = read.cigartuples
-    readstart = read.pos
-    readend = read.pos + read.query_length
+    cigartuples = cigartuples
+    readstart = pos
+    readend = pos + query_length
 
     for ctuple in cigartuples:
-        if ctuple[0] == pysam.CDIFF:
+        if ctuple[0] == "X":
             subs.append((readstart + curr_pos, "X", ctuple[1]))
             curr_pos += ctuple[1]
-        elif ctuple[0] == pysam.CINS:
+        elif ctuple[0] == "I":
             subs.append((readstart + curr_pos, "I", ctuple[1]))
-        elif ctuple[0] == pysam.CDEL:
+        elif ctuple[0] == "D":
             subs.append((readstart + curr_pos, "D", ctuple[1]))
             curr_pos += ctuple[1]
-        elif ctuple[0] == pysam.CREF_SKIP:
+        elif ctuple[0] == "N":
             subs.append((readstart + curr_pos, "N", ctuple[1]))
             curr_pos += ctuple[1]
-        elif ctuple[0] == pysam.CEQUAL or ctuple[0] == pysam.CMATCH:
+        elif ctuple[0] == "M" or ctuple[0] == "=":
             curr_pos += ctuple[1]
 
     if len(cigartuples):
         first_ctuple = cigartuples[0]
         last_ctuple = cigartuples[-1]
 
-        if first_ctuple[0] == pysam.CSOFT_CLIP:
+        if first_ctuple[0] == "S":
             subs.append((readstart - first_ctuple[1], "S", first_ctuple[1]))
-        if first_ctuple[0] == pysam.CHARD_CLIP:
+        if first_ctuple[0] == "H":
             subs.append((readstart - first_ctuple[1], "H", first_ctuple[1]))
 
-        if last_ctuple[0] == pysam.CSOFT_CLIP:
+        if last_ctuple[0] == "S":
             subs.append((readend - last_ctuple[1], "S", last_ctuple[1]))
-        if last_ctuple[0] == pysam.CHARD_CLIP:
+        if last_ctuple[0] == "H":
             subs.append((readend, "H", last_ctuple[1]))
 
     return subs
+
+
+def parse_cigar_string(cigar):
+    parts = []
+    curr = 0
+    for c in cigar:
+        if c.isnumeric():
+            curr = curr * 10 + int(c)
+        else:
+            parts += [(c, curr)]
+            curr = 0
+    return parts
+
+
+def reconstruct_ref(seq, md, cigar):
+    """Reconstruct a reference sequence that has the insertions from the query sequence.
+
+    The reason we can't exclude the insertions is that they are encoded for in the CIGAR
+    string so we would need to use that to remove them.
+    """
+    ref = ""
+    i_seq = 0
+    i_md = 0
+    match_count = 0
+    deletion = False
+    l = 0
+
+    new_seq = ""
+
+    # go through the cigar and remove the ignored bases
+    for i_cig in range(len(cigar)):
+        if cigar[i_cig].isnumeric():
+            # getting the number of bases the upcoming operation applies to
+            l = l * 10 + int(cigar[i_cig])
+        else:
+            op = cigar[i_cig]
+            if op == "S" or op == "I":
+                i_seq += l
+            else:
+                new_seq += seq[i_seq : i_seq + l]
+
+            l = 0
+            i_cig += 1
+
+    i_seq = 0
+    seq = new_seq
+
+    # let's iterate over the entire md string
+    for i_md in range(len(md)):
+        # if we encounter a numeric value then we keep track of what it is
+        if md[i_md].isnumeric():
+            match_count = match_count * 10 + int(md[i_md])
+            # We're definitely no in a deletion if we're in a numeric number
+            deletion = False
+        else:
+            # Add the matches that we've gone over
+            # If we've been going over a deletion or mismatches, then match_count will be 0
+            ref += seq[i_seq : i_seq + match_count]
+            i_seq += match_count
+            match_count = 0
+
+            if md[i_md] == "^":
+                # We're starting a deletion sequence
+                deletion = True
+            else:
+                # A letter can indicate that we're either encountering a deletion
+                # or a mistmatch
+
+                if deletion:
+                    # It's a deletion in the reference
+                    ref += md[i_md]
+                else:
+                    # It's a mismatch, add the MD letter and skip the sequence letter
+                    ref += md[i_md]
+                    i_seq += 1
+
+    # Add the last match_count stretch
+    ref += seq[i_seq : i_seq + match_count]
+    return ref
+
+
+def variants_list(seq, ref, pos, cigar):
+    """Get a list of variants that are in seq relative to ref
+
+    Returns:
+        A list of (query_pos, ref_pos, query_base) pairs.
+    """
+    l = 0
+    i_cig = 0
+    i_seq = 0
+    i_ref = 0
+    variants = []
+
+    for i_cig in range(len(cigar)):
+        if cigar[i_cig].isnumeric():
+            # getting the number of bases the upcoming operation applies to
+            l = l * 10 + int(cigar[i_cig])
+        else:
+            op = cigar[i_cig]
+            # print("l", l, "op", op)
+            if op == "M" or op == "=" or op == "X":
+                # Match or mismatch
+                # print("l:", l, "op", op)
+                for j in range(l):
+                    # print(
+                    #     "comparing",
+                    #     i_seq + j,
+                    #     seq[i_seq + j],
+                    #     i_ref + j,
+                    #     ref[i_ref + j],
+                    # )
+
+                    if seq[i_seq + j] != ref[i_ref + j]:
+                        # print(
+                        #     "mm",
+                        #     i_seq + j,
+                        #     i_ref + j,
+                        #     seq[i_seq + j],
+                        #     ref_with_insertions[i_ref + j],
+                        # )
+                        variants += [(i_seq + j, pos + i_ref + j - 1, seq[i_seq + j])]
+
+                i_seq += l
+                i_ref += l
+            elif op == "I" or op == "S":
+                i_seq += l
+            elif op == "D":
+                # The query has had deletions from the reference added to it so we have to skip
+                # them in the reference
+                i_ref += l
+            l = 0
+
+        i_cig += 1
+
+    return variants
 
 
 def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache=None):
@@ -159,7 +294,31 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
         )
         reads_df = pl.read_ipc(ipc)
 
-        return reads_df
+        # We can drastically speed these functions up by coding them in Rust in oxbow
+        results["cigars"] = [
+            get_cigar_substitutions(pos - 1, end - pos, parse_cigar_string(cigar))
+            for pos, end, cigar in zip(
+                reads_df["pos"], reads_df["end"], reads_df["cigar"]
+            )
+        ]
+
+        if "MD" not in reads_df:
+            results["variants"] = []
+        else:
+            results["variants"] = [
+                (
+                    variants_list(
+                        iseq, reconstruct_ref(iseq, imd, icigar), ipos, icigar
+                    )
+                    if imd
+                    else []
+                )
+                for iseq, imd, ipos, icigar in zip(
+                    reads_df["seq"], reads_df["MD"], reads_df["pos"], reads_df["cigar"]
+                )
+            ]
+
+        return results, reads_df
 
         reads_df["is_paired"] = reads_df["flag"] & 1
 
