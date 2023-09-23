@@ -302,9 +302,34 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
             )
         ]
 
+        num_reads = len(reads_df)
+
+        results["first_seq"] = reads_df["flag"] & 64
+        results["last_seq"] = reads_df["flag"] & 128
+        results["is_paired"] = reads_df["flag"] & 1
+        results["from"] = list(reads_df["pos"] - 1)
+        results["to"] = list(reads_df["end"])
+        results["chrName"] = list(reads_df["rname"])
+        results["chrOffset"] = [chr_offset] * num_reads
+        results["cigars"] = list(reads_df["cigar"])
+
+        results["id"] = [
+            name if not is_paired else (f"{name}_1" if first else f"{name}_2")
+            for name, first, is_paired in zip(
+                reads_df["qname"], results["first_seq"], results["is_paired"]
+            )
+        ]
+
+        if "HP" not in reads_df:
+            results["tags.HP"] = [0] * num_reads
+        else:
+            results["tags.HP"] = reads_df["HP"]
+
         if "MD" not in reads_df:
+            results["md"] = [""] * num_reads
             results["variants"] = []
         else:
+            results["md"] = list(reads_df["MD"])
             results["variants"] = [
                 (
                     variants_list(
@@ -317,102 +342,6 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
                     reads_df["seq"], reads_df["MD"], reads_df["pos"], reads_df["cigar"]
                 )
             ]
-
-        return results, reads_df
-
-        reads_df["is_paired"] = reads_df["flag"] & 1
-
-        print(reads_df["is_paired"].head())
-        1 / 0
-
-        for read in reads:
-            if read.is_unmapped:
-                continue
-            # query_seq = read.query_sequence
-
-            # differences = []
-
-            # try:
-            #     for counter, (qpos, rpos, ref_base) in enumerate(read.get_aligned_pairs(with_seq=True)):
-            #         # inferred from the pysam source code:
-            #         # https://github.com/pysam-developers/pysam/blob/3defba98911d99abf8c14a483e979431f069a9d2/pysam/libcalignedsegment.pyx
-            #         # and GitHub issue:
-            #         # https://github.com/pysam-developers/pysam/issues/163
-            #         #print('qpos, rpos, ref_base', qpos, rpos, ref_base)
-            #         if rpos is None:
-            #             differences += [(qpos, 'I')]
-            #         elif qpos is None:
-            #             differences += [(counter, 'D')]
-            #         elif ref_base.islower():
-            #             differences += [(qpos, query_seq[qpos], ref_base)]
-            # except ValueError as ve:
-            #     # probably lacked an MD string
-            #     pass
-            try:
-                id_suffix = ""
-                if read.is_paired:
-                    if read.is_read1:
-                        id_suffix = "_1"
-                    if read.is_read2:
-                        id_suffix = "_2"
-
-                read_id = read.query_name + id_suffix
-                results["id"] += [read_id]
-                results["from"] += [int(read.reference_start + chr_offset)]
-                results["to"] += [int(read.reference_end + chr_offset)]
-                results["chrName"] += [read.reference_name]
-                results["chrOffset"] += [chr_offset]
-                results["cigar"] += [read.cigarstring]
-                results["mapq"] += [read.mapq]
-                # aligned_pairs = read.get_aligned_pairs(with_seq=True)
-
-                # For ONT reads retrieving the variants can be a lengthy
-                # procedure. We can try to cache them
-                use_cache = read.query_length > 40000
-                if use_cache:
-                    variants = get_cached_variants(cache, read_id)
-                else:
-                    variants = None
-                # variants = None
-
-                if not variants:
-                    if read.query_sequence:
-                        # read.get_aligned_pairs(with_seq=True, matches_only=True)
-                        try:
-                            variants = [
-                                (r[0], r[1], read.query_sequence[r[0]])
-                                for r in read.get_aligned_pairs(
-                                    with_seq=True, matches_only=True
-                                )
-                                if start <= r[1] <= end
-                                and r[2] is not None
-                                and r[2].islower()
-                            ]
-                        except ValueError:
-                            # Probably MD tag not present
-                            variants = []
-
-                        if use_cache:
-                            set_cached_variants(cache, read_id, variants)
-
-                        results["variants"] += [variants]
-                    else:
-                        results["variants"] += []
-                else:
-                    results["variants"] += [variants]
-
-                results["cigars"] += [get_cigar_substitutions(read)]
-                tags = dict(read.tags)
-                results["tags.HP"] += [tags.get("HP", 0)]
-                results["strand"] += [strands[read.is_reverse]]
-            except:
-                raise
-
-            try:
-                results["md"] += [read.get_tag("MD")]
-            except KeyError:
-                results["md"] += [""]
-                continue
 
     return results
 
