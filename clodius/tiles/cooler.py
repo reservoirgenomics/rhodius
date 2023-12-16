@@ -117,6 +117,7 @@ def get_data(
         j1 = min(j1, matrix.shape[1] - 1)
 
     pixels = matrix[i0 : i1 + 1, j0 : j1 + 1]
+    print("pixels", pixels)
 
     """
     if not len(pixels):
@@ -132,6 +133,8 @@ def get_data(
 
     bins = c.bins(convert_enum=False)[cols]
     pixels = cooler.annotate(pixels, bins)
+
+    print("pixels", pixels)
 
     pixels["genome_start1"] = chrom_cum_lengths[pixels["chrom1"]] + pixels["start1"]
     pixels["genome_start2"] = chrom_cum_lengths[pixels["chrom2"]] + pixels["start2"]
@@ -188,7 +191,7 @@ def _get_info_multi_v1(file_path):
         max_zoom = f.attrs["max-zoom"]
         bin_size = int(f[str(max_zoom)].attrs["bin-size"])
 
-        max_width = bin_size * TILE_SIZE * 2 ** max_zoom
+        max_width = bin_size * TILE_SIZE * 2**max_zoom
 
         # the list of available data transforms
         transforms = {}
@@ -231,7 +234,7 @@ def get_quadtree_depth(chromsizes, binsize):
 
 def get_zoom_resolutions(chromsizes, base_res):
     return [
-        base_res * 2 ** x for x in range(get_quadtree_depth(chromsizes, base_res) + 1)
+        base_res * 2**x for x in range(get_quadtree_depth(chromsizes, base_res) + 1)
     ]
 
 
@@ -254,6 +257,7 @@ def make_tiles(
     transform_type="default",
     x_width=1,
     y_width=1,
+    real_resolution=None,
 ):
     """
     Generate tiles for a given location. This function retrieves tiles for
@@ -279,7 +283,10 @@ def make_tiles(
     data_by_tilepos: {(x_pos, y_pos) : np.array}
         A dictionary of tile data indexed by tile positions
     """
+    print("make tiles", resolution, real_resolution)
     BINS_PER_TILE = 256
+    if not real_resolution:
+        real_resolution = resolution
 
     tile_size = resolution * BINS_PER_TILE
 
@@ -290,6 +297,7 @@ def make_tiles(
 
     # print("resolution:", resolution)
     # print("tile_size:", tile_size)
+    print("start1", start1, "end1", end1)
     # print("transform_type:", transform_type);
     # print('start1:', start1, end1)
     # print('start2:', start2, end2)
@@ -320,7 +328,6 @@ def make_tiles(
 
     for x_offset in range(0, x_width):
         for y_offset in range(0, y_width):
-
             start1 = (x_pos + x_offset) * tile_size
             end1 = (x_pos + x_offset + 1) * tile_size
             start2 = (y_pos + y_offset) * tile_size
@@ -342,6 +349,10 @@ def make_tiles(
 
             j = ((df["genome_start1"].values - start1) // binsize).astype(int)
             i = ((df["genome_start2"].values - start2) // binsize).astype(int)
+
+            # print("df", df)
+            # print("j", j)
+            # print("i", i)
 
             if "balanced" in df:
                 v = np.nan_to_num(df["balanced"].values)
@@ -485,15 +496,39 @@ def make_mats(filepath):
     if "resolutions" in f:
         # this file contains raw resolutions so it'll return a different
         # sort of tileset info
-        info = {"resolutions": tuple(sorted(map(int, list(f["resolutions"].keys()))))}
+        info = {}
+
+        resolutions_list = list(sorted(map(int, list(f["resolutions"].keys()))))
+        info["real_resolutions"] = resolutions_list
+        min_resolution = resolutions_list[0]
+
+        print("hi")
+        smaller_resolutions = []
+        while min_resolution >= 2:
+            min_resolution = min_resolution // 2
+            smaller_resolutions += [min_resolution]
+
+        if smaller_resolutions[-1] != 1:
+            smaller_resolutions += [1]
+
+        resolutions_list = tuple(smaller_resolutions[::-1] + resolutions_list)
+
+        info["resolutions"] = resolutions_list
         mats[filepath] = [f, info]
+
+        print("resolutions", info["resolutions"])
 
         # see which transforms are available, a transform has to be
         # available at every available resolution in order for it to
         # be provided as an option
         available_transforms_per_resolution = {}
 
-        for resolution in info["resolutions"]:
+        if "real_resolutions" in info:
+            resolutions = info["real_resolutions"]
+        else:
+            resolutions = info["resolutions"]
+
+        for resolution in resolutions:
             available_transforms_per_resolution[resolution] = get_available_transforms(
                 f["resolutions"][str(resolution)]
             )
@@ -526,6 +561,7 @@ def make_mats(filepath):
         info["min_pos"] = [int(m) for m in info["min_pos"]]
         info["max_pos"] = [int(m) for m in info["max_pos"]]
         info["max_zoom"] = int(info["max_zoom"])
+        # info["max_zoom"] = 99
         info["max_width"] = int(info["max_width"])
 
         if "transforms" in info:
@@ -585,8 +621,7 @@ def add_transform_type(tile_id):
 
 
 def tiles(filepath, tile_ids):
-    """
-    """
+    """ """
     transform_id_to_original_id = {}
 
     new_tile_ids = []
@@ -651,6 +686,7 @@ def generate_tiles(filepath, tile_ids):
         transform_type = get_transform_type(tile_group[0])
         tileset_info = tileset_file_and_info[1]
         tileset_file = tileset_file_and_info[0]
+        real_resolution = None
 
         if "resolutions" in tileset_info:
             sorted_resolutions = sorted(
@@ -661,13 +697,24 @@ def generate_tiles(filepath, tile_ids):
                 continue
 
             resolution = sorted_resolutions[zoom_level]
-            hdf_for_resolution = tileset_file["resolutions"][str(resolution)]
+
+            if (
+                "real_resolutions" in tileset_info
+                and resolution < tileset_info["real_resolutions"][0]
+            ):
+                # Smaller virtual resolutions are present
+                hdf_for_resolution = tileset_file["resolutions"][
+                    str(tileset_info["real_resolutions"][0])
+                ]
+                real_resolution = tileset_info["real_resolutions"][0]
+            else:
+                hdf_for_resolution = tileset_file["resolutions"][str(resolution)]
         else:
             if zoom_level > tileset_info["max_zoom"]:
                 # this tile has too high of a zoom level specified
                 continue
             hdf_for_resolution = tileset_file[str(zoom_level)]
-            resolution = (tileset_info["max_width"] / 2 ** zoom_level) / BINS_PER_TILE
+            resolution = (tileset_info["max_width"] / 2**zoom_level) / BINS_PER_TILE
 
         tile_positions = [[int(x) for x in t.split(".")[2:4]] for t in tile_group]
 
@@ -689,6 +736,7 @@ def generate_tiles(filepath, tile_ids):
         miny = min([t[1] for t in tile_positions])
         maxy = max([t[1] for t in tile_positions])
 
+        print("hdf_for_resolution", hdf_for_resolution)
         tile_data_by_position = make_tiles(
             hdf_for_resolution,
             resolution,
@@ -697,6 +745,7 @@ def generate_tiles(filepath, tile_ids):
             transform_type,
             maxx - minx + 1,
             maxy - miny + 1,
+            real_resolution=real_resolution,
         )
 
         tiles = [

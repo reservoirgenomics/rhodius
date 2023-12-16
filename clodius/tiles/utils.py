@@ -247,7 +247,7 @@ class TileInfo(BaseModel):
 def parse_tile_position(tile_position: List[int], tsinfo: TilesetInfo) -> TileInfo:
     zoom_level = int(tile_position[0])
 
-    tile_width = tsinfo.max_width / 2 ** int(tile_position[0])
+    tile_width = tsinfo.max_width / 2**zoom_level
 
     starts = [
         pos * (tsinfo.max_width / 2**zoom_level) + tsinfo.min_pos[i]

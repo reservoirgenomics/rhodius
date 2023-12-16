@@ -8,7 +8,7 @@ pandas
 slugid
 sortedcontainers
 nose
-cooler>=0.8.5
+cooler==0.8.11
 pybbi>=0.2.0
 Click>=7
 pydantic
