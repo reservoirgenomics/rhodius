@@ -1,6 +1,5 @@
 numpy
 negspy
-pysam
 dask
 requests
 h5py
