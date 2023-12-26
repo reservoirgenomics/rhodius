@@ -8,7 +8,8 @@ import pandas as pd
 from pydantic import BaseModel
 
 import clodius.tiles.tabix as ctt
-import pysam
+
+# import pysam
 import slugid
 from clodius.tiles.vcf import generic_regions
 

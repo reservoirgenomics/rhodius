@@ -6,7 +6,8 @@ import pandas as pd
 
 import clodius.tiles.tabix as rtt
 from clodius.tiles.bigwig import abs2genomic
-from pysam import VariantFile
+
+# from pysam import VariantFile
 
 
 def grouper(n, iterable):

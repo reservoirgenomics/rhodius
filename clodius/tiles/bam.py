@@ -189,7 +189,7 @@ def variants_list(seq, ref, pos, cigar):
 def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache=None):
     """
     Sample reads from the specified region, assuming that the chromosomes
-    are ordered in some fashion. Returns an list of pysam reads
+    are ordered in some fashion. Returns an list of reads
 
     Parameters:
     -----------

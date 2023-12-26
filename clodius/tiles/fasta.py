@@ -6,7 +6,8 @@ import numpy as np
 import clodius.tiles.chromsizes as cts
 from clodius.tiles.format import format_dense_tile
 from clodius.tiles.utils import TilesetInfo, abs2genome_fn, parse_tile_id
-from pysam import FastaFile
+
+# from pysam import FastaFile
 
 TILE_SIZE = 1024
 

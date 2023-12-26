@@ -8,7 +8,8 @@ import pandas as pd
 from pandas.errors import EmptyDataError
 
 import clodius.tiles.tabix as ctt
-import pysam
+
+# import pysam
 import slugid
 
 cache = []
