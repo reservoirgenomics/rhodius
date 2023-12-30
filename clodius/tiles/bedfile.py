@@ -6,6 +6,7 @@ import random
 
 import pandas as pd
 from pydantic import BaseModel
+import io
 
 import clodius.tiles.tabix as ctt
 
@@ -67,7 +68,11 @@ def tileset_info(filename, chromsizes=None, index_filename=None):
     max_width = sum([c[1] for c in chromsizes_list])
 
     if not index_filename:
-        filesize = os.stat(filename).st_size
+        if isinstance(filename, str):
+            filesize = os.stat(filename).st_size
+        else:
+            filename.seek(0, io.SEEK_END)
+            filesize = filename.tell()
 
         if filesize > 20e6:
             return {"error": "File too large (>20Mb), please index"}

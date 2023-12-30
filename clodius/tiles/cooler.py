@@ -10,6 +10,8 @@ import clodius.tiles.format as hgfo
 import clodius.tiles.utils as hgut
 import pandas as pd
 
+import time
+
 logger = logging.getLogger(__name__)
 
 global mats
@@ -133,9 +135,14 @@ def get_data(
     bins = c.bins(convert_enum=False)[cols]
     pixels = cooler.annotate(pixels, bins)
 
+    # t1 = time.time()
     pixels["genome_start1"] = chrom_cum_lengths[pixels["chrom1"]] + pixels["start1"]
+    # t2 = time.time()
     pixels["genome_start2"] = chrom_cum_lengths[pixels["chrom2"]] + pixels["start2"]
+    # t3 = time.time()
 
+    # print(f"genome_start1: {t2 - t1:.2f}")
+    # print(f"genome_start: {t2 - t1:.2f}")
     bins1 = bins[i0 : i1 + 1]
     bins2 = bins[j0 : j1 + 1]
 
@@ -340,7 +347,7 @@ def make_tiles(
             j = ((df["genome_start1"].values - start1) // binsize).astype(int)
             i = ((df["genome_start2"].values - start2) // binsize).astype(int)
 
-            # print("df", df) 
+            # print("df", df)
             # print("j", j)
             # print("i", i)
 
