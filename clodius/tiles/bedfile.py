@@ -11,8 +11,8 @@ import io
 import clodius.tiles.tabix as ctt
 
 # import pysam
-import slugid
 from clodius.tiles.vcf import generic_regions
+from clodius.utils import get_file_compression
 
 cache = []
 
@@ -71,8 +71,13 @@ def tileset_info(filename, chromsizes=None, index_filename=None):
         if isinstance(filename, str):
             filesize = os.stat(filename).st_size
         else:
+            # We're going to record the current position in the file
+            # seek to the end to see how big it is and then seek back to
+            # the original position
+            orig_pos = filename.tell()
             filename.seek(0, io.SEEK_END)
             filesize = filename.tell()
+            filename.seek(orig_pos)
 
         if filesize > 20e6:
             return {"error": "File too large (>20Mb), please index"}
@@ -97,21 +102,6 @@ def row_to_bedlike(row, css, orig_columns):
     }
 
     return ret
-
-
-def get_compression(filename):
-    if filename.endswith(".gz..") or filename.endswith(".gz"):
-        return "gzip"
-    elif filename.endswith(".bgz..") or filename.endswith(".bgz"):
-        return "gzip"
-    elif filename.endswith(".bz2..") or filename.endswith(".bz2"):
-        return "bz2"
-    elif filename.endswith(".zip..") or filename.endswith(".zip"):
-        return "zip"
-    elif filename.endswith(".xz..") or filename.endswith("xz"):
-        return "xz"
-    else:
-        return None
 
 
 def ts_hash(filename, chromsizes):
@@ -166,19 +156,28 @@ def single_indexed_tile(
     return formatted
 
 
-def get_bedfile_values(filename, chromsizes):
+def get_bedfile_values(filename, chromsizes, settings):
     """Return a processed bedfile containing a dataframe and
     and some other information."""
+    cache = settings.get("cache")
+    identifier = settings.get("filename")
+    hash_ = None
 
-    hash_ = ts_hash(filename, chromsizes)
+    print("identifier", identifier)
 
-    # hash the loaded data table so that we don't have to read the entire thing
-    # and calculate cumulative start and end positions
-    val = cache.get(hash_)
+    if identifier:
+        hash_ = ts_hash(identifier, chromsizes)
+
+        # hash the loaded data table so that we don't have to read the entire thing
+        # and calculate cumulative start and end positions
+        val = cache.get(hash_) if cache else None
 
     if val is None:
         t = pd.read_csv(
-            filename, header=None, delimiter="\t", compression=get_compression(filename)
+            filename,
+            header=None,
+            delimiter="\t",
+            compression="infer",
         )
 
         orig_columns = t.columns
@@ -193,7 +192,9 @@ def get_bedfile_values(filename, chromsizes):
         t["ix"] = t.index
 
         val = {"rows": t, "orig_columns": orig_columns, "css": css}
-        cache.set(hash_, val)
+
+        if cache and hash_:
+            cache.set(hash_, val)
 
     return val
 
@@ -210,7 +211,7 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
         settings = {}
 
     try:
-        val = get_bedfile_values(filename, chromsizes)
+        val = get_bedfile_values(filename, chromsizes, settings)
     except KeyError as ke:
         return {
             "error": f"Key error: (bedfile tab separated? correct chromsizes?) {str(ke)}"
@@ -276,7 +277,9 @@ def tiles(
                 settings=settings,
             )
         else:
-            values = single_tile_func(filename, chromsizes, tsinfo, z, x)
+            values = single_tile_func(
+                filename, chromsizes, tsinfo, z, x, settings=settings
+            )
 
         tile_values += [(tile_id, values)]
 
