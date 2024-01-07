@@ -1,6 +1,9 @@
 ### Running tests
 
 ```
+pytest test/tiles/tabix_test.py
+
+tabix -f -p bed data/hg19.repeats.short.bed.gz
 ```
 
 ### Converting tsv files to mrmatrix

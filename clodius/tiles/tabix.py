@@ -3,6 +3,7 @@ import gzip
 import math
 import random
 import struct
+import zlib
 
 import numpy as np
 
@@ -46,49 +47,58 @@ def load_tbi_idx(index_filename):
     """Load a reduced version of a tabix index so that we can
     go through it and get a sense of how much data will be
     retrieved by a query."""
-    with gzip.open(index_filename, "rb") as f:
-        b = bytearray(f.read())
 
-        [
-            _,
-            _,
-            _,
-            _,
-            n_ref,
-            format,
-            col_seq,
-            col_beg,
-            col_end,
-            meta,
-            skip,
-            l_nm,
-        ] = struct.unpack("<4ciiiiiiii", b[:36])
-        c = 36
+    if isinstance(index_filename, str):
+        f = open(index_filename, "rb")
+    else:
+        f = index_filename
 
-        names = [n.decode("ascii") for n in b[c : c + l_nm].split(b"\0")]
-        c += l_nm
+    f.seek(0)
+    ba = bytearray(f.read())
 
-        indeces = []
+    # The 15 + 32 comes from https://stackoverflow.com/a/6124315
+    # Without that parameter lib complains about zlib.error: Error -3 while decompressing data: incorrect header check
+    b = zlib.decompress(ba, 15 + 32)
 
-        for i in range(n_ref):
-            n_bin = struct.unpack("<i", b[c : c + 4])[0]
-            c += 4
-            bins = col.defaultdict(list)
-            for j in range(n_bin):
-                [bin_no, n_chunk] = struct.unpack("<Ii", b[c : c + 8])
-                c += 8
+    [
+        _,
+        _,
+        _,
+        _,
+        n_ref,
+        format,
+        col_seq,
+        col_beg,
+        col_end,
+        meta,
+        skip,
+        l_nm,
+    ] = struct.unpack("<4ciiiiiiii", b[:36])
+    c = 36
+    names = [n.decode("ascii") for n in b[c : c + l_nm].split(b"\0")]
+    c += l_nm
 
-                bytes_to_read = n_chunk * 2 * 8
-                unpack_str = f"<{2 * n_chunk}Q"
-                bins[bin_no] = struct.unpack(unpack_str, b[c : c + bytes_to_read])
-                c += bytes_to_read
+    indeces = []
 
-            n_intv = struct.unpack("<i", b[c : c + 4])[0]
-            c += 4 + 8 * n_intv
+    for i in range(n_ref):
+        n_bin = struct.unpack("<i", b[c : c + 4])[0]
+        c += 4
+        bins = col.defaultdict(list)
+        for j in range(n_bin):
+            [bin_no, n_chunk] = struct.unpack("<Ii", b[c : c + 8])
+            c += 8
 
-            indeces += [bins]
+            bytes_to_read = n_chunk * 2 * 8
+            unpack_str = f"<{2 * n_chunk}Q"
+            bins[bin_no] = struct.unpack(unpack_str, b[c : c + bytes_to_read])
+            c += bytes_to_read
 
-        return dict(zip(names, indeces))
+        n_intv = struct.unpack("<i", b[c : c + 4])[0]
+        c += 4 + 8 * n_intv
+
+        indeces += [bins]
+
+    return dict(zip(names, indeces))
 
 
 def chunks(lst, n):

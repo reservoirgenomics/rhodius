@@ -113,11 +113,32 @@ def single_indexed_tile(
     filename, index_filename, chromsizes, tsinfo, z, x, tbx_index, settings
 ):
     """Retrieve a single tile from an indexed bedfile."""
-    tb = pysam.TabixFile(filename, index=index_filename, encoding="utf8")
     css = chromsizes.cumsum().shift().fillna(0).to_dict()
 
+    # import pysam
+
+    # tb = pysam.TabixFile(filename, index=index_filename, encoding="utf8")
+
+    # def fetcher(ref, start, end):
+    #     return tb.fetch(ref, start, end)
+
+    import oxbow as ox
+    import polars as pl
+
+    print(filename)
+    print(index_filename)
+
     def fetcher(ref, start, end):
-        return tb.fetch(ref, start, end)
+        if start == 0:
+            start = 1
+        pos = f"{ref}:{start}-{end}"
+        print("pos", pos)
+        filename.seek(0)
+        index_filename.seek(0)
+        arrow_ipc = ox.read_tabix(filename, pos, index_filename)
+        df = pl.read_ipc(arrow_ipc)
+
+        return [x.split("\t") for x in df["raw"]]
 
     try:
         res = ctt.single_indexed_tile(

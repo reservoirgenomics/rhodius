@@ -289,11 +289,14 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
 
         file.seek(0)
         index_file.seek(0)
-        ipc = ox.read_bam(
-            file, f"{seq_name}:{start}-{end}", index=index_file, tags=set(["MD", "HP"])
-        )
+        # ipc = ox.read_bam(
+        #     file, f"{seq_name}:{start}-{end}", index=index_file, tags=set(["MD", "HP"])
+        # )
+        region = f"{seq_name}:{start}-{end}"
+        print("region", region)
+        ipc = ox.read_bam(file, region, index=index_file)
         reads_df = pl.read_ipc(ipc)
-
+        print("reads_df", reads_df.head())
         # We can drastically speed these functions up by coding them in Rust in oxbow
         results["cigars"] = [
             get_cigar_substitutions(pos - 1, end - pos, parse_cigar_string(cigar))
@@ -304,9 +307,9 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
 
         num_reads = len(reads_df)
 
-        results["first_seq"] = reads_df["flag"] & 64
-        results["last_seq"] = reads_df["flag"] & 128
-        results["is_paired"] = reads_df["flag"] & 1
+        results["first_seq"] = list(reads_df["flag"] & 64)
+        results["last_seq"] = list(reads_df["flag"] & 128)
+        results["is_paired"] = list(reads_df["flag"] & 1)
         results["from"] = list(reads_df["pos"] - 1)
         results["to"] = list(reads_df["end"])
         results["chrName"] = list(reads_df["rname"])
@@ -343,6 +346,7 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
                 )
             ]
 
+    print("results", results)
     return results
 
 
