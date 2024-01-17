@@ -293,10 +293,8 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
         #     file, f"{seq_name}:{start}-{end}", index=index_file, tags=set(["MD", "HP"])
         # )
         region = f"{seq_name}:{start}-{end}"
-        print("region", region)
         ipc = ox.read_bam(file, region, index=index_file)
         reads_df = pl.read_ipc(ipc)
-        print("reads_df", reads_df.head())
         # We can drastically speed these functions up by coding them in Rust in oxbow
         results["cigars"] = [
             get_cigar_substitutions(pos - 1, end - pos, parse_cigar_string(cigar))
@@ -346,7 +344,6 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
                 )
             ]
 
-    print("results", results)
     return results
 
 

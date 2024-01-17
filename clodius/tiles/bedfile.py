@@ -7,6 +7,7 @@ import random
 import pandas as pd
 from pydantic import BaseModel
 import io
+import json
 
 import clodius.tiles.tabix as ctt
 
@@ -132,10 +133,16 @@ def single_indexed_tile(
         if start == 0:
             start = 1
         pos = f"{ref}:{start}-{end}"
-        print("pos", pos)
         filename.seek(0)
         index_filename.seek(0)
-        arrow_ipc = ox.read_tabix(filename, pos, index_filename)
+        try:
+            arrow_ipc = ox.read_tabix(filename, pos, index_filename)
+        except ValueError as ex:
+            print("str(ex)", str(ex))
+            if "missing reference sequence" in str(ex):
+                return []
+            raise
+
         df = pl.read_ipc(arrow_ipc)
 
         return [x.split("\t") for x in df["raw"]]
@@ -163,9 +170,9 @@ def single_indexed_tile(
         return res
 
     for row in res:
-        parts = row.split("\t")
+        parts = row
         ret = {
-            "uid": hashlib.md5(row.encode("utf-8")).hexdigest(),
+            "uid": hashlib.md5("\t".join(row).encode("utf-8")).hexdigest(),
             "xStart": css[parts[0]] + int(parts[1]),
             "xEnd": css[parts[0]] + int(parts[2]),
             "chrOffset": css[parts[0]],
@@ -191,7 +198,7 @@ def get_bedfile_values(filename, chromsizes, settings):
 
         # hash the loaded data table so that we don't have to read the entire thing
         # and calculate cumulative start and end positions
-        val = cache.get(hash_) if cache else None
+        val = json.loads(cache.get(hash_)) if cache else None
 
     if val is None:
         t = pd.read_csv(
@@ -215,7 +222,7 @@ def get_bedfile_values(filename, chromsizes, settings):
         val = {"rows": t, "orig_columns": orig_columns, "css": css}
 
         if cache and hash_:
-            cache.set(hash_, val)
+            cache.set(hash_, json.dumps(val))
 
     return val
 
