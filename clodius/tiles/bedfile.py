@@ -198,7 +198,8 @@ def get_bedfile_values(filename, chromsizes, settings):
 
         # hash the loaded data table so that we don't have to read the entire thing
         # and calculate cumulative start and end positions
-        val = json.loads(cache.get(hash_)) if cache else None
+        val = cache.get(hash_) if cache else None
+        val = json.loads(val) if val else None
 
     if val is None:
         t = pd.read_csv(
