@@ -214,7 +214,7 @@ def get_bedfile_values(filename, chromsizes, settings):
             compression="infer",
         )
 
-        orig_columns = t.columns
+        orig_columns = list(t.columns)
         css = chromsizes.cumsum().shift().fillna(0).to_dict()
 
         # xStart and xEnd are cumulative start and end positions calculated
