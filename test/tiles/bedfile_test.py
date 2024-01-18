@@ -22,14 +22,27 @@ def test_bed_tiles():
     assert "error" in tiles[0][1]
 
 
+class MockCache:
+    def __init__(self):
+        self.cache = {}
+
+    def get(self, key):
+        return self.cache.get(key)
+
+    def set(self, key, value):
+        self.cache[key] = value
+
+
 def test_bed_regions():
     valid_filename = op.join("data", "regions.valid.bed")
     chromsizes_fn = op.join("data", "chm13v1.chrom.sizes")
     chromsizes = cc.chromsizes_as_series(chromsizes_fn)
 
     regions = ctb.regions(valid_filename, chromsizes, 0, 10)
+    assert len(regions[0]) == 10
 
-    # regions = ctb.regions(valid_filename, chromsizes, 0, 10, MagicMock())
+    regions = ctb.regions(valid_filename, chromsizes, 0, 10, MockCache())
+
     assert len(regions[0]) == 10
 
 
