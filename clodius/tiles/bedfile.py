@@ -10,10 +10,13 @@ import io
 import json
 
 import clodius.tiles.tabix as ctt
+import logging
 
 # import pysam
 from clodius.tiles.vcf import generic_regions
 from clodius.utils import get_file_compression
+
+logger = logging.getLogger(__name__)
 
 cache = []
 
@@ -191,7 +194,9 @@ def get_bedfile_values(filename, chromsizes, settings):
     identifier = settings.get("filename")
     hash_ = None
 
-    print("identifier", identifier)
+    logger.info("bedfiles identifier", identifier)
+
+    val = None
 
     if identifier:
         hash_ = ts_hash(identifier, chromsizes)
@@ -220,8 +225,7 @@ def get_bedfile_values(filename, chromsizes, settings):
         t["xEnd"] = t["chromStart"] + t[2]
         t["ix"] = t.index
 
-        val = {"rows": t, "orig_columns": orig_columns, "css": css}
-
+        val = {"rows": t.to_json(), "orig_columns": orig_columns, "css": css}
         if cache and hash_:
             cache.set(hash_, json.dumps(val))
 
@@ -246,7 +250,7 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
             "error": f"Key error: (bedfile tab separated? correct chromsizes?) {str(ke)}"
         }
 
-    t = val["rows"]
+    t = pd.read_json(val["rows"])
     orig_columns = val["orig_columns"]
     css = val["css"]
 
@@ -321,7 +325,7 @@ class BedfileEntry(BaseModel):
     end: int
 
 
-def regions(filename, chromsizes, offset, limit):
+def regions(filename, chromsizes, offset, limit, settings={}):
     """Return a list of regions in the range.
 
     Arguments:
@@ -332,10 +336,10 @@ def regions(filename, chromsizes, offset, limit):
             fetching entries
         limit: The total number of entries to fetch
     """
-    vals = get_bedfile_values(filename, chromsizes)
+    vals = get_bedfile_values(filename, chromsizes, settings=settings)
 
     def row_iterator():
-        for ix, row in vals["rows"].iterrows():
+        for ix, row in pd.read_json(vals["rows"]).iterrows():
             yield {
                 "uid": row["ix"],
                 "chrOffset": row["chromStart"],
