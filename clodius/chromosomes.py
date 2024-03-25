@@ -1,6 +1,7 @@
 import negspy.coordinates as nc
 import numpy as np
 import pandas as pd
+from smart_open import open
 
 
 def chromsizes_array_to_series(chromsizes):

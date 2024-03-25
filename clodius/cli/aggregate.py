@@ -20,8 +20,8 @@ import slugid
 import sqlite3
 import sys
 import time
-import gzip
 import json
+from smart_open import open
 
 from .utils import get_tile_pos_from_lng_lat, transaction
 
@@ -205,8 +205,6 @@ def _bedpe(
 
     if filepath == "-":
         f = sys.stdin
-    elif filepath.endswith(".gz"):
-        f = gzip.open(filepath, "rt")
     else:
         f = open(filepath, "r")
 
@@ -323,7 +321,7 @@ def _bedpe(
         chrom_sizes=chrom_sizes,
         tile_size=tile_size,
         max_zoom=max_zoom,
-        max_width=tile_size * 2 ** max_zoom,
+        max_width=tile_size * 2**max_zoom,
         version=BED2DDB_VERSION,
     )
 
@@ -476,13 +474,9 @@ def _bedfile(
     if op.exists(output_file):
         os.remove(output_file)
 
-    if filepath.endswith(".gz"):
-        import gzip
+    bed_file = open(filepath, "r")
 
-        bed_file = gzip.open(filepath, "rt")
-    else:
-        bed_file = open(filepath, "r")
-
+    print("chromsizes_filename", chromsizes_filename)
     try:
         (chrom_info, chrom_names, chrom_sizes) = cch.load_chromsizes(
             chromsizes_filename, assembly
@@ -623,7 +617,7 @@ def _bedfile(
         chrom_sizes=chrom_sizes,
         tile_size=tile_size,
         max_zoom=max_zoom,
-        max_width=tile_size * 2 ** max_zoom,
+        max_width=tile_size * 2**max_zoom,
         header=header,
         version=BEDDB_VERSION,
     )
@@ -826,7 +820,7 @@ def _bedgraph(
 
     tile_size = tile_size
     # how many values to read in at once while tiling
-    chunk_size = tile_size * 2 ** chunk_size
+    chunk_size = tile_size * 2**chunk_size
 
     dsets = []  # data sets at each zoom level
     nan_dsets = []  # store nan values
@@ -838,8 +832,8 @@ def _bedgraph(
     data_buffers = [[]]
     nan_data_buffers = [[]]
 
-    while assembly_size / 2 ** z > tile_size:
-        dset_length = math.ceil(assembly_size / 2 ** z)
+    while assembly_size / 2**z > tile_size:
+        dset_length = math.ceil(assembly_size / 2**z)
         dsets += [
             f.create_dataset(
                 "values_" + str(z), (dset_length,), dtype="f", compression="gzip"
@@ -872,7 +866,7 @@ def _bedgraph(
     d.attrs["max-zoom"] = max_zoom = math.ceil(
         math.log(d.attrs["max-length"] / tile_size) / math.log(2)
     )
-    d.attrs["max-width"] = tile_size * 2 ** max_zoom
+    d.attrs["max-width"] = tile_size * 2**max_zoom
     d.attrs["max-position"] = 0
 
     print("assembly size (max-length)", d.attrs["max-length"])
@@ -888,12 +882,7 @@ def _bedgraph(
     if filepath == "-":
         f = sys.stdin
     else:
-        if filepath.endswith(".gz"):
-            import gzip
-
-            f = gzip.open(filepath, "rt")
-        else:
-            f = open(filepath, "r")
+        f = open(filepath, "r")
 
     curr_zoom = 0
 
@@ -934,11 +923,9 @@ def _bedgraph(
 
             # aggregate and store aggregated values in the next zoom_level's
             # data
-            data_buffers[curr_zoom + 1] += list(
-                ct.aggregate(curr_chunk, 2 ** zoom_step)
-            )
+            data_buffers[curr_zoom + 1] += list(ct.aggregate(curr_chunk, 2**zoom_step))
             nan_data_buffers[curr_zoom + 1] += list(
-                ct.aggregate(nan_curr_chunk, 2 ** zoom_step)
+                ct.aggregate(nan_curr_chunk, 2**zoom_step)
             )
 
             data_buffers[curr_zoom] = data_buffers[curr_zoom][chunk_size:]
@@ -1049,9 +1036,9 @@ def _bedgraph(
         nan_dsets[curr_zoom][curr_pos : curr_pos + chunk_size] = nan_curr_chunk
 
         # aggregate and store aggregated values in the next zoom_level's data
-        data_buffers[curr_zoom + 1] += list(ct.aggregate(curr_chunk, 2 ** zoom_step))
+        data_buffers[curr_zoom + 1] += list(ct.aggregate(curr_chunk, 2**zoom_step))
         nan_data_buffers[curr_zoom + 1] += list(
-            ct.aggregate(nan_curr_chunk, 2 ** zoom_step)
+            ct.aggregate(nan_curr_chunk, 2**zoom_step)
         )
 
         data_buffers[curr_zoom] = data_buffers[curr_zoom][chunk_size:]
@@ -1073,8 +1060,6 @@ def _bedgraph(
 def _geojson(filepath, output_file, max_per_tile, tile_size, max_zoom):
     if filepath == "-":
         f = sys.stdin
-    elif filepath.endswith(".gz"):
-        f = gzip.open(filepath, "rt")
     else:
         f = open(filepath, "r")
 

@@ -129,9 +129,6 @@ def single_indexed_tile(
     import oxbow as ox
     import polars as pl
 
-    print(filename)
-    print(index_filename)
-
     def fetcher(ref, start, end):
         if start == 0:
             start = 1
@@ -141,7 +138,7 @@ def single_indexed_tile(
         try:
             arrow_ipc = ox.read_tabix(filename, pos, index_filename)
         except ValueError as ex:
-            print("str(ex)", str(ex))
+            # print("str(ex)", str(ex))
             if "missing reference sequence" in str(ex):
                 return []
             raise
