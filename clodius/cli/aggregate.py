@@ -463,7 +463,11 @@ def _bedfile(
     delimiter,
     chromsizes_filename,
     offset,
+    print_freq=1000,
 ):
+    """
+    :param print_freq: Print a status every print_freq lines. If 0, turn off status printing.
+    """
     BEDDB_VERSION = 3
 
     if output_file is None:
@@ -476,7 +480,6 @@ def _bedfile(
 
     bed_file = open(filepath, "r")
 
-    print("chromsizes_filename", chromsizes_filename)
     try:
         (chrom_info, chrom_names, chrom_sizes) = cch.load_chromsizes(
             chromsizes_filename, assembly
@@ -750,8 +753,9 @@ def _bedfile(
                     ),
                 )
 
-                if counter % 1000 == 0:
-                    print("counter:", counter, value["endPos"] - value["startPos"])
+                if print_freq:
+                    if counter % print_freq == 0:
+                        print("counter:", counter, value["endPos"] - value["startPos"])
 
                 exec_statement = "INSERT INTO position_index VALUES (?,?,?,?,?)"
                 c.execute(

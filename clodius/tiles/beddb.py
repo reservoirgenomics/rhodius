@@ -3,6 +3,9 @@ import sqlite3
 import s3fs
 import s3sqlite
 import apsw
+import logging
+
+logger = logging.getLogger(__name__)
 
 sovfs = s3sqlite.SmartOpenVFS(name="so-vfs")
 
