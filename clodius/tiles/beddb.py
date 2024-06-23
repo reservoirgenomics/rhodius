@@ -74,9 +74,8 @@ def tiles(filepath, tile_ids):
     to_return = []
 
     for tile_id in tile_ids:
-        # tile_option_parts = tile_id.split(TILE_OPTIONS_CHAR)[1:]
-        # tile_no_options = tile_id.split(TILE_OPTIONS_CHAR)[0]
-        tile_no_options = tile_id
+        tile_option_parts = tile_id.split(TILE_OPTIONS_CHAR)[1:]
+        tile_no_options = tile_id.split(TILE_OPTIONS_CHAR)[0]
         parts = tile_no_options.split(".")
 
         zoom = int(parts[1])
