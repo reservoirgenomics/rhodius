@@ -9,6 +9,7 @@ import pandas as pd
 import pybigtools
 
 import clodius.tiles.format as hgfo
+from clodius.utils import TILE_OPTIONS_CHAR
 
 MAX_THREADS = 4
 TILE_SIZE = 1024
@@ -297,7 +298,7 @@ def tiles(bwpath, tile_ids, chromsizes_map={}, chromsizes=None):
     chromsizes_map: {uid: []}
         A set of chromsizes listings corresponding to the parameters of the
         tile_ids. To be used if a chromsizes id is passed in with the tile id
-        with the `|cos:id` tag in the tile id
+        with the `,cos:id` tag in the tile id
     chromsizes: [[chrom, size],...]
         A 2d array containing chromosome names and sizes. Overrides the
         chromsizes in chromsizes_map
@@ -310,8 +311,8 @@ def tiles(bwpath, tile_ids, chromsizes_map={}, chromsizes=None):
     TILE_SIZE = 1024
     generated_tiles = []
     for tile_id in tile_ids:
-        tile_option_parts = tile_id.split("|")[1:]
-        tile_no_options = tile_id.split("|")[0]
+        tile_option_parts = tile_id.split(TILE_OPTIONS_CHAR)[1:]
+        tile_no_options = tile_id.split(TILE_OPTIONS_CHAR)[0]
         tile_id_parts = tile_no_options.split(".")
         tile_position = list(map(int, tile_id_parts[1:3]))
         return_value = tile_id_parts[3] if len(tile_id_parts) > 3 else "mean"

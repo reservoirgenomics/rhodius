@@ -5,6 +5,8 @@ import s3sqlite
 import apsw
 import logging
 
+from clodius.utils import TILE_OPTIONS_CHAR
+
 logger = logging.getLogger(__name__)
 
 sovfs = s3sqlite.SmartOpenVFS(name="so-vfs")
@@ -72,8 +74,9 @@ def tiles(filepath, tile_ids):
     to_return = []
 
     for tile_id in tile_ids:
-        # tile_option_parts = tile_id.split('|')[1:]
-        tile_no_options = tile_id.split("|")[0]
+        # tile_option_parts = tile_id.split(TILE_OPTIONS_CHAR)[1:]
+        # tile_no_options = tile_id.split(TILE_OPTIONS_CHAR)[0]
+        tile_no_options = tile_id
         parts = tile_no_options.split(".")
 
         zoom = int(parts[1])

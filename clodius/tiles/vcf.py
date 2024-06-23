@@ -6,6 +6,7 @@ import pandas as pd
 
 import clodius.tiles.tabix as rtt
 from clodius.tiles.bigwig import abs2genomic
+from clodius.utils import TILE_OPTIONS_CHAR
 
 # from pysam import VariantFile
 
@@ -180,8 +181,8 @@ def tiles(filename, tile_ids, index_filename, chromsizes, max_tile_width=None):
         index = rtt.load_tbi_idx(index_filename)
 
     for tile_id in tile_ids:
-        tile_option_parts = tile_id.split("|")[1:]
-        tile_no_options = tile_id.split("|")[0]
+        tile_option_parts = tile_id.split(TILE_OPTIONS_CHAR)[1:]
+        tile_no_options = tile_id.split(TILE_OPTIONS_CHAR)[0]
         tile_id_parts = tile_no_options.split(".")
         tile_position = list(map(int, tile_id_parts[1:3]))
 

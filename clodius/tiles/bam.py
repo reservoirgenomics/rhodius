@@ -6,6 +6,7 @@ import numpy as np
 import clodius.tiles.bigwig as ctbw
 from clodius.tiles.tabix import est_query_size_ix, load_bai_index
 from clodius.tiles.utils import abs2genomic
+from clodius.utils import TILE_OPTIONS_CHAR
 
 import oxbow as ox
 import polars as pl
@@ -460,7 +461,7 @@ def alignment_tiles(
     tsinfo = alignment_tileset_info(file, chromsizes)
 
     for tile_id in tile_ids:
-        tile_id_parts = tile_id.split("|")[0].split(".")
+        tile_id_parts = tile_id.split(TILE_OPTIONS_CHAR)[0].split(".")
         tile_position = list(map(int, tile_id_parts[1:3]))
 
         tile_width = tsinfo["max_width"] // 2 ** int(tile_position[0])

@@ -97,3 +97,6 @@ def get_file_compression(f) -> str:
             return filetype
 
     return "no match"
+
+
+TILE_OPTIONS_CHAR = ","

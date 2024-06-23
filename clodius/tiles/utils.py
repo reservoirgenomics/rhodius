@@ -8,6 +8,7 @@ import numpy as np
 from pydantic import BaseModel, validator
 
 from clodius.chromosomes import load_chromsizes
+from clodius.utils import TILE_OPTIONS_CHAR
 
 
 def partition_by_adjacent_tiles(tile_ids, dimension=2):
@@ -268,7 +269,7 @@ def parse_tile_position(tile_position: List[int], tsinfo: TilesetInfo) -> TileIn
 
 
 def parse_tile_id(tile_id: str, tsinfo: TilesetInfo) -> TileInfo:
-    tile_id_parts = tile_id.split("|")[0].split(".")
+    tile_id_parts = tile_id.split(TILE_OPTIONS_CHAR)[0].split(".")
     tile_position = list(map(int, tile_id_parts[1:3]))
 
     return parse_tile_position(tile_position, tsinfo)

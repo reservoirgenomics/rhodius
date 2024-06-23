@@ -14,7 +14,7 @@ import logging
 
 # import pysam
 from clodius.tiles.vcf import generic_regions
-from clodius.utils import get_file_compression
+from clodius.utils import get_file_compression, TILE_OPTIONS_CHAR
 
 logger = logging.getLogger(__name__)
 
@@ -283,8 +283,8 @@ def tiles(
         index = ctt.load_tbi_idx(index_filename)
 
     for tile_id in tile_ids:
-        tile_option_parts = tile_id.split("|")[1:]
-        tile_no_options = tile_id.split("|")[0]
+        tile_option_parts = tile_id.split(TILE_OPTIONS_CHAR)[1:]
+        tile_no_options = tile_id.split(TILE_OPTIONS_CHAR)[0]
         tile_id_parts = tile_no_options.split(".")
         tile_position = list(map(int, tile_id_parts[1:3]))
         tile_options = dict([o.split(":") for o in tile_option_parts])

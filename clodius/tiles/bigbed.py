@@ -6,6 +6,8 @@ import numpy.random as nr
 import pandas as pd
 import random
 import clodius.tiles.bigwig as hgbw
+from clodius.utils import TILE_OPTIONS_CHAR
+
 import slugid
 
 from concurrent.futures import ThreadPoolExecutor
@@ -114,11 +116,14 @@ def fetch_data(a):
     intervals_length = 0
     scores = []
 
-    return [{
-        'chrOffset': chrOffsets[chrom],
-        'importance': random.random(),
-        'fields': interval
-    } for interval in intervals2]
+    return [
+        {
+            "chrOffset": chrOffsets[chrom],
+            "importance": random.random(),
+            "fields": interval,
+        }
+        for interval in intervals2
+    ]
 
     if not intervals:
         return final_intervals
@@ -129,7 +134,6 @@ def fetch_data(a):
         except (ValueError, IndexError):
             scores.append(DEFAULT_SCORE)
         intervals_length += 1
-
 
     # generate beddb-like elements for parsing by the higlass plugin
     if intervals_length >= min_elements and intervals_length <= max_elements:
@@ -224,8 +228,7 @@ def get_bigbed_tile(
     NUM_TO_PICK = 128
     if NUM_TO_PICK < len(probs):
         rnds_ixs = nr.choice(
-            len(cids_starts_ends), NUM_TO_PICK, p=probs,
-            replace=NUM_TO_PICK
+            len(cids_starts_ends), NUM_TO_PICK, p=probs, replace=NUM_TO_PICK
         )
         chosen_starts_ends = [cids_starts_ends[ix] for ix in rnds_ixs]
     else:
@@ -234,11 +237,7 @@ def get_bigbed_tile(
     for c in chosen_starts_ends:
         if c[0] >= len(chromsizes):
             continue
-        intervals += bbi.fetch_intervals(
-            bbpath,
-            chromsizes.index[c[0]],
-            c[1], c[2]
-        )
+        intervals += bbi.fetch_intervals(bbpath, chromsizes.index[c[0]], c[1], c[2])
 
     MAX_RET = 100
 
@@ -247,12 +246,15 @@ def get_bigbed_tile(
     else:
         chosen_intervals = intervals
 
-    all_intervals = [{
-        'chrOffset': chrOffsets[interval[0]],
-        'importance': random.random(),
-        'uid': slugid.nice(),
-        'fields': interval
-    } for interval in chosen_intervals]
+    all_intervals = [
+        {
+            "chrOffset": chrOffsets[interval[0]],
+            "importance": random.random(),
+            "uid": slugid.nice(),
+            "fields": interval,
+        }
+        for interval in chosen_intervals
+    ]
 
     return all_intervals
 
@@ -287,8 +289,8 @@ def tiles(bbpath, tile_ids, chromsizes_map={}, chromsizes=None):
 
     generated_tiles = []
     for tile_id in tile_ids:
-        tile_option_parts = tile_id.split("|")[1:]
-        tile_no_options = tile_id.split("|")[0]
+        tile_option_parts = tile_id.split(TILE_OPTIONS_CHAR)[1:]
+        tile_no_options = tile_id.split(TILE_OPTIONS_CHAR)[0]
         tile_id_parts = tile_no_options.split(".")
         tile_position = list(map(int, tile_id_parts[1:3]))
         return_value = (
