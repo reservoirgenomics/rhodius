@@ -187,19 +187,23 @@ def fetch_data(a):
 
         args = [str(chrom), int(start), int(end), n_bins]
 
-        if range_mode == "minMax":
-            x[:, 0] = b.values(*args, "min")
-            x[:, 1] = b.values(*args, "max")
+        try:
+            if range_mode == "minMax":
+                x[:, 0] = b.values(*args, "min")
+                x[:, 1] = b.values(*args, "max")
 
-        elif range_mode == "whisker":
-            x[:, 0] = b.values(*args, "min")
-            x[:, 1] = b.values(*args, "max")
-            x[:, 2] = b.values(*args, "mean")
-            x[:, 3] = b.values(*args, "std")
+            elif range_mode == "whisker":
+                x[:, 0] = b.values(*args, "min")
+                x[:, 1] = b.values(*args, "max")
+                x[:, 2] = b.values(*args, "mean")
+                x[:, 3] = b.values(*args, "std")
 
-        else:
-            # print("args", [a for a in args], "aggregation_mode", aggregation_mode)
-            x[:] = b.values(*args, aggregation_mode)
+            else:
+                # print("args", [a for a in args], "aggregation_mode", aggregation_mode)
+                x[:] = b.values(*args, aggregation_mode)
+        except Exception as ex:
+            if "No chromomsome with name" in str(ex):
+                raise KeyError
 
         # the following is commented out because it is handled in get_bigwig_tile
         # # drop the very last bin if it is smaller than the binsize
