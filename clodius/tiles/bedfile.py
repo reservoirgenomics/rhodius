@@ -191,7 +191,7 @@ def get_bedfile_values(filename, chromsizes, settings):
     identifier = settings.get("filename")
     hash_ = None
 
-    logger.info("bedfiles identifier", identifier)
+    logger.info("bedfiles identifier: %s", identifier)
 
     val = None
 
