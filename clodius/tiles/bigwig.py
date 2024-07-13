@@ -93,6 +93,7 @@ def get_chromsizes(bwpath):
     Also, return NaNs from any missing chromosomes in bbi.fetch
 
     """
+    bwpath.seek(0)
     f = pybigtools.open(bwpath)
     chromsizes = f.chroms()
     chromosomes = natsorted(chromsizes.keys())
@@ -179,6 +180,7 @@ def fetch_data(a):
     if not isinstance(bwpath, str):
         bwpath.seek(0)
 
+    bwpath.seek(0)
     b = pybigtools.open(bwpath)
 
     try:
