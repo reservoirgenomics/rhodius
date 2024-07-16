@@ -44,20 +44,6 @@ class LRUCache:
 cache = LRUCache(1)
 
 
-def get_compression(filename):
-    """Check whether a file is gzipped."""
-
-    if (
-        filename.endswith(".gz..")
-        or filename.endswith(".gz")
-        or filename.endswith(".bgz")
-        or filename.endswith(".bgz..")
-    ):
-        return "gzip"
-    else:
-        return None
-
-
 def tileset_info(filename, chromsizes=None):
     """
 
@@ -78,20 +64,13 @@ def tileset_info(filename, chromsizes=None):
         sep="\t",
         comment="#",
         header=None,
-        compression=get_compression(filename),
     )
 
     header = ""
 
     try:
         t_head = pd.read_csv(
-            filename,
-            nrows=2,
-            sep="\t",
-            comment="#",
-            header=None,
-            skiprows=1,
-            compression=get_compression(filename),
+            filename, nrows=2, sep="\t", comment="#", header=None, skiprows=1
         )
 
         if (t.dtypes == t_head.dtypes).all():
@@ -111,7 +90,11 @@ def tileset_info(filename, chromsizes=None):
 
     max_width = sum([c[1] for c in chromsizes_list])
 
-    if os.stat(filename).st_size > 20e6:
+    filename.seek(0, 2)
+    filesize = filename.tell()
+    filename.seek(0)
+
+    if filesize > 20e6:
         return {"error": "File too large (>20Mb), please index"}
 
     tsinfo = {
@@ -142,19 +125,6 @@ def row_to_bedlike(row, css, orig_columns):
     return ret
 
 
-def get_compression(filename):
-    if filename.endswith(".gz..") or filename.endswith(".gz"):
-        return "gzip"
-    elif filename.endswith(".bz2..") or filename.endswith(".bz2"):
-        return "bz2"
-    elif filename.endswith(".zip..") or filename.endswith(".zip"):
-        return "zip"
-    elif filename.endswith(".xz..") or filename.endswith("xz"):
-        return "xz"
-    else:
-        return None
-
-
 def ts_hash(filename, chromsizes):
     cs_hash = hashlib.md5(str(chromsizes).encode("utf-8")).hexdigest()
     return f"{filename}.{cs_hash}"
@@ -182,7 +152,6 @@ def bedpe_to_df(filename, chromsizes, tsinfo):
         header=None,
         comment="#",
         sep="\t",
-        compression=get_compression(filename),
         skiprows=skiprows,
     )
 
