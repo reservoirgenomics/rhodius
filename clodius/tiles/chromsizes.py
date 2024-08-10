@@ -33,12 +33,12 @@ def get_tsv_chromsizes(file):
         An ordered list of chromosome names and sizes
     """
     try:
+        file.seek(0)
         binary_data = file.read()
         text_data = binary_data.decode("utf-8")
 
         lines = text_data.split("\n")
         data = [l.strip().split("\t") for l in lines if l.strip()]
-        print("data", data)
         return data
     except Exception as ex:
         logger.error(ex)

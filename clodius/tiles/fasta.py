@@ -81,6 +81,52 @@ def multivec_tiles(*args, **kwargs):
     return sequence_tiles_to_multivec(seq_tiles)
 
 
+def read_fai(fai_file):
+    fai_index = {}
+    fai_file.seek(0)
+    binary_data = fai_file.read()
+    text_data = binary_data.decode("utf-8")
+
+    for line in [l.strip() for l in text_data.split("\n") if l.strip()]:
+        fields = line.strip().split("\t")
+        seq_name = fields[0]
+        seq_length = int(fields[1])
+        offset = int(fields[2])
+        line_blen = int(fields[3])
+        line_len = int(fields[4])
+        fai_index[seq_name] = (seq_length, offset, line_blen, line_len)
+    return fai_index
+
+
+def fetch_sequence(fasta_file, fai_index, seq_name, start, end):
+    if seq_name not in fai_index:
+        raise ValueError(f"Sequence {seq_name} not found in index")
+
+    seq_length, offset, line_blen, line_len = fai_index[seq_name]
+
+    if start < 0 or end > seq_length or start >= end:
+        raise ValueError(f"Invalid range: {start}-{end} for sequence {seq_name}")
+
+    # Calculate the byte range to read
+    lines_to_skip = start // line_blen
+    lines_to_read = (end - start + line_blen - 1) // line_blen
+
+    f = fasta_file
+    # Move to the start of the sequence in the FASTA file
+    f.seek(offset + lines_to_skip * line_len + (start % line_blen))
+
+    # Read the required lines
+    sequence = []
+    while lines_to_read > 0:
+        chunk = f.read(min(end - start, line_blen - (start % line_blen)))
+        sequence.append(chunk.strip().decode("utf8"))
+        start += len(chunk)
+        lines_to_read -= 1
+        f.seek(f.tell() + (line_len - line_blen))  # Skip to the next line
+
+    return "".join(sequence)
+
+
 def sequence_tiles(
     fasta_filename: str,
     tile_ids: List[str],
@@ -102,7 +148,7 @@ def sequence_tiles(
     tsinfo = TilesetInfo(**tsinfo)
     generated_tiles = []
 
-    fa_file = FastaFile(fasta_filename, index_filename)
+    fa_index = read_fai(index_filename)
 
     if not chromsizes_fn:
         chromsizes_fn = index_filename
@@ -127,8 +173,12 @@ def sequence_tiles(
         for chr_interval in abs2genome_fn(
             chromsizes_fn, tile_info.start[0], tile_info.end[0]
         ):
-            seq += fa_file.fetch(
-                chr_interval.name, chr_interval.start, chr_interval.end
+            seq += fetch_sequence(
+                fasta_filename,
+                fa_index,
+                chr_interval.name,
+                chr_interval.start,
+                chr_interval.end,
             )
 
         generated_tiles += [(tile_id, {"sequence": seq})]
