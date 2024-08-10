@@ -17,15 +17,15 @@ def tileset_info(filename):
     }
 
 
-def get_tsv_chromsizes(filename):
+def get_tsv_chromsizes(file):
     """
     Get a list of chromosome sizes from this [presumably] tsv
     chromsizes file file.
 
     Parameters:
     -----------
-    filename: string
-        The filename of the tsv file
+    file: string
+        A file-like object
 
     Returns
     -------
@@ -33,16 +33,16 @@ def get_tsv_chromsizes(filename):
         An ordered list of chromosome names and sizes
     """
     try:
-        with open(filename, "r") as f:
-            reader = csv.reader(f, delimiter="\t")
+        binary_data = file.read()
+        text_data = binary_data.decode("utf-8")
 
-            data = []
-            for row in reader:
-                data.append(row)
+        lines = text_data.split("\n")
+        data = [l.strip().split("\t") for l in lines if l.strip()]
+        print("data", data)
         return data
     except Exception as ex:
         logger.error(ex)
 
-        err_msg = "WHAT?! Could not load file %s. 😤 (%s)" % (filename, ex)
+        err_msg = "WHAT?! Could not load file %s." % (ex)
 
         raise Exception(err_msg)
