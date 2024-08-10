@@ -1,7 +1,9 @@
 import csv
 import logging
+from smart_open import open
 
 logger = logging.getLogger(__name__)
+
 
 def tileset_info(filename):
     chromsizes = get_tsv_chromsizes(filename)
@@ -13,6 +15,7 @@ def tileset_info(filename):
         "min_pos": [0],
         "max_pos": [max_width],
     }
+
 
 def get_tsv_chromsizes(filename):
     """

@@ -1,6 +1,7 @@
-import sqlite3
+from time import time
 
-import s3fs
+t1 = time()
+
 import s3sqlite
 import apsw
 import logging
@@ -92,7 +93,6 @@ def tiles(filepath, tile_ids):
             old_rows = get_1D_tiles(filepath, zoom + extra_zoom, higher_xpos)
             new_rows += old_rows
 
-        # print("new_rows length", len(new_rows))
         to_return += [(tile_id, new_rows)]
 
     return to_return
@@ -234,78 +234,79 @@ def list_items(db_file, start, end, max_entries=None):
     ts_info = tileset_info(db_file)
     version = ts_info["version"]
 
-    conn = sqlite3.connect(db_file)
+    with apsw.Connection(
+        db_file, vfs=sovfs.name, flags=apsw.SQLITE_OPEN_READONLY
+    ) as conn:
 
-    c = conn.cursor()
+        c = conn.cursor()
 
-    # some large number because we want to extract all entries
-    zoom = 100000
+        # some large number because we want to extract all entries
+        zoom = 100000
 
-    query = """
-    SELECT startPos, endPos, chrOffset, importance, fields, uid
-    FROM intervals,position_index
-    WHERE
-        intervals.id=position_index.id AND
-        zoomLevel <= {} AND
-        rEndPos >= {} AND
-        rStartPos <= {}
-    """.format(
-        zoom, start, end
-    )
-
-    if version == 2:
         query = """
         SELECT startPos, endPos, chrOffset, importance, fields, uid
         FROM intervals,position_index
         WHERE
             intervals.id=position_index.id AND
-            rStartZoomLevel <= {} AND
-            rEndZoomLevel >= 0 AND
+            zoomLevel <= {} AND
             rEndPos >= {} AND
             rStartPos <= {}
         """.format(
             zoom, start, end
         )
 
-    if version == 3:
-        query = """
-        SELECT startPos, endPos, chrOffset, importance, fields, uid, name
-        FROM intervals,position_index
-        WHERE
-            intervals.id=position_index.id AND
-            rStartZoomLevel <= {} AND
-            rEndZoomLevel >= 0 AND
-            rEndPos >= {} AND
-            rStartPos <= {}
-        """.format(
-            zoom, start, end
-        )
-    if max_entries is not None:
-        query += " LIMIT {}".format(max_entries)
-
-    rows = c.execute(query).fetchall()
-
-    new_rows = []
-
-    for r in rows:
-        try:
-            uid = r[5].decode("utf-8")
-        except AttributeError:
-            uid = r[5]
-
-        to_add = {
-            "xStart": r[0],
-            "xEnd": r[1],
-            "chrOffset": r[2],
-            "importance": r[3],
-            "uid": uid,
-            "fields": r[4].split("\t"),
-        }
+        if version == 2:
+            query = """
+            SELECT startPos, endPos, chrOffset, importance, fields, uid
+            FROM intervals,position_index
+            WHERE
+                intervals.id=position_index.id AND
+                rStartZoomLevel <= {} AND
+                rEndZoomLevel >= 0 AND
+                rEndPos >= {} AND
+                rStartPos <= {}
+            """.format(
+                zoom, start, end
+            )
 
         if version == 3:
-            to_add["name"] = r[6]
+            query = """
+            SELECT startPos, endPos, chrOffset, importance, fields, uid, name
+            FROM intervals,position_index
+            WHERE
+                intervals.id=position_index.id AND
+                rStartZoomLevel <= {} AND
+                rEndZoomLevel >= 0 AND
+                rEndPos >= {} AND
+                rStartPos <= {}
+            """.format(
+                zoom, start, end
+            )
+        if max_entries is not None:
+            query += " LIMIT {}".format(max_entries)
 
-        new_rows += [to_add]
-    conn.close()
+        rows = c.execute(query).fetchall()
 
-    return new_rows
+        new_rows = []
+
+        for r in rows:
+            try:
+                uid = r[5].decode("utf-8")
+            except AttributeError:
+                uid = r[5]
+
+            to_add = {
+                "xStart": r[0],
+                "xEnd": r[1],
+                "chrOffset": r[2],
+                "importance": r[3],
+                "uid": uid,
+                "fields": r[4].split("\t"),
+            }
+
+            if version == 3:
+                to_add["name"] = r[6]
+
+            new_rows += [to_add]
+
+        return new_rows
