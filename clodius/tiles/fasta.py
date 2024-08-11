@@ -109,22 +109,32 @@ def fetch_sequence(fasta_file, fai_index, seq_name, start, end):
 
     # Calculate the byte range to read
     lines_to_skip = start // line_blen
-    lines_to_read = (end - start + line_blen - 1) // line_blen
-
     f = fasta_file
     # Move to the start of the sequence in the FASTA file
     f.seek(offset + lines_to_skip * line_len + (start % line_blen))
 
+    # print("seq_name", seq_name)
+    # print("line_blen", line_blen)
+    # print("line_len", line_len)
+    # print("start", start)
+    # print("end", end)
+
     # Read the required lines
+    total_read = 0
     sequence = []
-    while lines_to_read > 0:
+    to_read = end - start
+    while total_read < to_read:
+        # print("end - start", end - start)
         chunk = f.read(min(end - start, line_blen - (start % line_blen)))
+        # print("chunk", len(chunk))
         sequence.append(chunk.strip().decode("utf8"))
         start += len(chunk)
-        lines_to_read -= 1
+        total_read += len(chunk)
         f.seek(f.tell() + (line_len - line_blen))  # Skip to the next line
 
-    return "".join(sequence)
+    full_seq = "".join(sequence)
+    # print("len(full_seq):", len(full_seq))
+    return full_seq
 
 
 def sequence_tiles(
@@ -173,13 +183,18 @@ def sequence_tiles(
         for chr_interval in abs2genome_fn(
             chromsizes_fn, tile_info.start[0], tile_info.end[0]
         ):
-            seq += fetch_sequence(
+            fs = fetch_sequence(
                 fasta_filename,
                 fa_index,
                 chr_interval.name,
                 chr_interval.start,
                 chr_interval.end,
             )
+            # fas = fa_file.fetch(chr_interval.name, chr_interval.start, chr_interval.end)
+
+            # assert fs == fas
+
+            seq += fs
 
         generated_tiles += [(tile_id, {"sequence": seq})]
 
