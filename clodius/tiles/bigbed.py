@@ -7,7 +7,7 @@ import pandas as pd
 import random
 import clodius.tiles.bigwig as hgbw
 from clodius.utils import TILE_OPTIONS_CHAR
-
+import pybigtools
 import slugid
 
 from concurrent.futures import ThreadPoolExecutor
@@ -29,163 +29,163 @@ def tileset_info(bbpath, chromsizes=None):
     return ti
 
 
-def fetch_data(a):
-    (
-        bbpath,
-        binsize,
-        chromsizes,
-        range_mode,
-        min_elements,
-        max_elements,
-        cid,
-        start,
-        end,
-    ) = a
+# def fetch_data(a):
+#     (
+#         bbpath,
+#         binsize,
+#         chromsizes,
+#         range_mode,
+#         min_elements,
+#         max_elements,
+#         cid,
+#         start,
+#         end,
+#     ) = a
 
-    """
-    Retrieve tile data from a bigbed file.
+#     """
+#     Retrieve tile data from a bigbed file.
 
-    This approach currently returns a subset of intervals within the bounds of the specified
-    query range.
+#     This approach currently returns a subset of intervals within the bounds of the specified
+#     query range.
 
-    The subset is determined, at this time, by using the population of scores in the score
-    column of the BED data to generate a quantile value that would allow, at most, a maximum
-    number of elements (either a default or specified value). Because intervals are discrete
-    elements, it is possible for a quantile to allow a few more elements than the desired
-    limit; in this case, a uniformly-random sample is drawn from the thresholded set without
-    replacement.
+#     The subset is determined, at this time, by using the population of scores in the score
+#     column of the BED data to generate a quantile value that would allow, at most, a maximum
+#     number of elements (either a default or specified value). Because intervals are discrete
+#     elements, it is possible for a quantile to allow a few more elements than the desired
+#     limit; in this case, a uniformly-random sample is drawn from the thresholded set without
+#     replacement.
 
-    Parameters
-    ----------
-    bbpath: string
-        The path to the bigBed media file
-    binsize: integer
-        Resolution of a bin at a particular zoom level
-    chromsizes: [[chrom, size],...]
-        A 2d array containing chromosome names and sizes. Overrides the
-        chromsizes in chromsizes_map
-    range_mode: string or None
-        If specified, determines what rule is applied to intervals retrieved
-        over the specified chromosome, start, and end range
-    min_elements: integer
-        For fetched intervals, return no fewer than the specified number
-    max_elements: integer
-        For fetched intervals, return no more than the specified number
-    cid: integer
-        Index of chromosome associated with chromsizes
-    start: integer
-        Start position of interval query (relative to chromosome)
-    end: integer
-        End position of interval query (relative to chromosome)
+#     Parameters
+#     ----------
+#     bbpath: string
+#         The path to the bigBed media file
+#     binsize: integer
+#         Resolution of a bin at a particular zoom level
+#     chromsizes: [[chrom, size],...]
+#         A 2d array containing chromosome names and sizes. Overrides the
+#         chromsizes in chromsizes_map
+#     range_mode: string or None
+#         If specified, determines what rule is applied to intervals retrieved
+#         over the specified chromosome, start, and end range
+#     min_elements: integer
+#         For fetched intervals, return no fewer than the specified number
+#     max_elements: integer
+#         For fetched intervals, return no more than the specified number
+#     cid: integer
+#         Index of chromosome associated with chromsizes
+#     start: integer
+#         Start position of interval query (relative to chromosome)
+#     end: integer
+#         End position of interval query (relative to chromosome)
 
-    Returns
-    -------
-    intervals: [{'chrOffset': integer, 'importance': integer, 'fields': [interval]}, ... ]
-        A list of beddb-like gene annotation objects
-    """
+#     Returns
+#     -------
+#     intervals: [{'chrOffset': integer, 'importance': integer, 'fields': [interval]}, ... ]
+#         A list of beddb-like gene annotation objects
+#     """
 
-    try:
-        chrom = chromsizes.index[cid]
+#     try:
+#         chrom = chromsizes.index[cid]
 
-        fetch_factory = ft.partial(bbi.fetch_intervals, bbpath, chrom, start, end)
+#         fetch_factory = ft.partial(bbi.fetch_intervals, bbpath, chrom, start, end)
 
-        if range_mode == "significant":
-            intervals, intervals2 = fetch_factory(), fetch_factory()
-        else:
-            intervals, intervals2 = fetch_factory(), fetch_factory()
+#         if range_mode == "significant":
+#             intervals, intervals2 = fetch_factory(), fetch_factory()
+#         else:
+#             intervals, intervals2 = fetch_factory(), fetch_factory()
 
-    except IndexError:
-        # beyond the range of the available chromosomes
-        # probably means we've requested a range of absolute
-        # coordinates that stretch beyond the end of the genome
-        intervals, intervals2 = None, None
+#     except IndexError:
+#         # beyond the range of the available chromosomes
+#         # probably means we've requested a range of absolute
+#         # coordinates that stretch beyond the end of the genome
+#         intervals, intervals2 = None, None
 
-    except KeyError:
-        # probably requested a chromosome that doesn't exist (e.g. chrM)
-        intervals, intervals2 = None, None
+#     except KeyError:
+#         # probably requested a chromosome that doesn't exist (e.g. chrM)
+#         intervals, intervals2 = None, None
 
-    offset = 0
-    offsetIdx = 0
-    chrOffsets = {}
-    for chrSize in chromsizes:
-        chrOffsets[chromsizes.index[offsetIdx]] = offset
-        offset += chrSize
-        offsetIdx += 1
+#     offset = 0
+#     offsetIdx = 0
+#     chrOffsets = {}
+#     for chrSize in chromsizes:
+#         chrOffsets[chromsizes.index[offsetIdx]] = offset
+#         offset += chrSize
+#         offsetIdx += 1
 
-    final_intervals = []
-    intervals_length = 0
-    scores = []
+#     final_intervals = []
+#     intervals_length = 0
+#     scores = []
 
-    return [
-        {
-            "chrOffset": chrOffsets[chrom],
-            "importance": random.random(),
-            "fields": interval,
-        }
-        for interval in intervals2
-    ]
+#     return [
+#         {
+#             "chrOffset": chrOffsets[chrom],
+#             "importance": random.random(),
+#             "fields": interval,
+#         }
+#         for interval in intervals2
+#     ]
 
-    if not intervals:
-        return final_intervals
+#     if not intervals:
+#         return final_intervals
 
-    for interval in intervals:
-        try:
-            scores.append(int(interval[4]))
-        except (ValueError, IndexError):
-            scores.append(DEFAULT_SCORE)
-        intervals_length += 1
+#     for interval in intervals:
+#         try:
+#             scores.append(int(interval[4]))
+#         except (ValueError, IndexError):
+#             scores.append(DEFAULT_SCORE)
+#         intervals_length += 1
 
-    # generate beddb-like elements for parsing by the higlass plugin
-    if intervals_length >= min_elements and intervals_length <= max_elements:
-        for interval in intervals2:
-            try:
-                score = int(interval[4])
-                final_intervals.append(
-                    {
-                        "chrOffset": chrOffsets[chrom],
-                        "importance": score,
-                        "fields": interval,
-                    }
-                )
-            except (ValueError, IndexError):
-                final_intervals.append(
-                    {
-                        "chrOffset": chrOffsets[chrom],
-                        "importance": DEFAULT_SCORE,
-                        "fields": interval,
-                    }
-                )
+#     # generate beddb-like elements for parsing by the higlass plugin
+#     if intervals_length >= min_elements and intervals_length <= max_elements:
+#         for interval in intervals2:
+#             try:
+#                 score = int(interval[4])
+#                 final_intervals.append(
+#                     {
+#                         "chrOffset": chrOffsets[chrom],
+#                         "importance": score,
+#                         "fields": interval,
+#                     }
+#                 )
+#             except (ValueError, IndexError):
+#                 final_intervals.append(
+#                     {
+#                         "chrOffset": chrOffsets[chrom],
+#                         "importance": DEFAULT_SCORE,
+#                         "fields": interval,
+#                     }
+#                 )
 
-    elif intervals_length > max_elements:
-        thresholded_intervals = []
-        desired_perc = max_elements / intervals_length
-        thresholded_score = int(np.quantile(scores, 1 - desired_perc))
-        for interval in intervals2:
-            try:
-                score = int(interval[4])
-                if score >= thresholded_score:
-                    thresholded_intervals.append(
-                        {
-                            "chrOffset": chrOffsets[chrom],
-                            "importance": score,
-                            "fields": interval,
-                        }
-                    )
-            except (ValueError, IndexError):
-                if DEFAULT_SCORE >= thresholded_score:
-                    thresholded_intervals.append(
-                        {
-                            "chrOffset": chrOffsets[chrom],
-                            "importance": DEFAULT_SCORE,
-                            "fields": interval,
-                        }
-                    )
-        thresholded_intervals_length = len(thresholded_intervals)
-        if thresholded_intervals_length > max_elements:
-            indices = random.sample(range(thresholded_intervals_length), max_elements)
-            final_intervals = [thresholded_intervals[i] for i in sorted(indices)]
+#     elif intervals_length > max_elements:
+#         thresholded_intervals = []
+#         desired_perc = max_elements / intervals_length
+#         thresholded_score = int(np.quantile(scores, 1 - desired_perc))
+#         for interval in intervals2:
+#             try:
+#                 score = int(interval[4])
+#                 if score >= thresholded_score:
+#                     thresholded_intervals.append(
+#                         {
+#                             "chrOffset": chrOffsets[chrom],
+#                             "importance": score,
+#                             "fields": interval,
+#                         }
+#                     )
+#             except (ValueError, IndexError):
+#                 if DEFAULT_SCORE >= thresholded_score:
+#                     thresholded_intervals.append(
+#                         {
+#                             "chrOffset": chrOffsets[chrom],
+#                             "importance": DEFAULT_SCORE,
+#                             "fields": interval,
+#                         }
+#                     )
+#         thresholded_intervals_length = len(thresholded_intervals)
+#         if thresholded_intervals_length > max_elements:
+#             indices = random.sample(range(thresholded_intervals_length), max_elements)
+#             final_intervals = [thresholded_intervals[i] for i in sorted(indices)]
 
-    return final_intervals
+#     return final_intervals
 
 
 def get_bigbed_tile(
@@ -198,6 +198,9 @@ def get_bigbed_tile(
     min_elements=None,
     max_elements=None,
 ):
+    bbpath.seek(0)
+    f = pybigtools.open(bbpath)
+
     if chromsizes is None:
         chromsizes = hgbw.get_chromsizes(bbpath)
 
@@ -225,6 +228,8 @@ def get_bigbed_tile(
     total_length = sum([c[2] - c[1] for c in cids_starts_ends])
     probs = [(c[2] - c[1]) / total_length for c in cids_starts_ends]
 
+    # If there's a million chromosomes, pick at most 128 ones at random
+    # weighted by their size
     NUM_TO_PICK = 128
     if NUM_TO_PICK < len(probs):
         rnds_ixs = nr.choice(
@@ -237,7 +242,12 @@ def get_bigbed_tile(
     for c in chosen_starts_ends:
         if c[0] >= len(chromsizes):
             continue
-        intervals += bbi.fetch_intervals(bbpath, chromsizes.index[c[0]], c[1], c[2])
+        # intervals += bbi.fetch_intervals(bbpath, chromsizes.index[c[0]], c[1], c[2])
+        intervals += [
+            # We're going to append the chromosome name to each record
+            (chromsizes.index[c[0]],) + r
+            for r in f.records(chromsizes.index[c[0]], c[1], c[2])
+        ]
 
     MAX_RET = 100
 
