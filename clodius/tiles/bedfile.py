@@ -191,6 +191,14 @@ def get_bedfile_values(filename, chromsizes, settings):
     identifier = settings.get("filename")
     hash_ = None
 
+    if not isinstance(filename, str):
+        # we already have a file pointer
+        filename = filename
+    else:
+        filename = open(filename, "rb")
+
+    f = filename
+
     logger.info("bedfiles identifier: %s", identifier)
 
     val = None
@@ -204,11 +212,20 @@ def get_bedfile_values(filename, chromsizes, settings):
         val = json.loads(val) if val else None
 
     if val is None:
+        ## We have a file-like object, we need to rewing to the beginning
+        f.seek(0)
+
+        ## Then we have to figure out how it's compressed because we expect a
+        ## file pointer with no compression enabled
+        compression = get_file_compression(filename)
+
         t = pd.read_csv(
             filename,
             header=None,
             delimiter="\t",
-            compression="infer",
+            encoding="ISO-8859-1",
+            comment="#",
+            compression=compression,
         )
 
         orig_columns = list(t.columns)
@@ -219,7 +236,11 @@ def get_bedfile_values(filename, chromsizes, settings):
         t["chromStart"] = t[0].map(lambda x: css[x])
 
         t["xStart"] = t["chromStart"] + t[1]
-        t["xEnd"] = t["chromStart"] + t[2]
+
+        if settings.get("filetype") == "vcf":
+            t["xEnd"] = t["chromStart"] + len(t[3])
+        else:
+            t["xEnd"] = t["chromStart"] + t[2]
         t["ix"] = t.index
 
         val = {"rows": t.to_json(), "orig_columns": orig_columns, "css": css}

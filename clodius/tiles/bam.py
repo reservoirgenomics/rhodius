@@ -216,6 +216,10 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
     """
     # if chromorder is not None...
     # specify the chromosome order for the fetched reads
+    if isinstance(file, str):
+        file = open(file, "rb")
+    if index_file and isinstance(index_file, str):
+        index_file = open(index_file, "rb")
 
     if chromsizes is not None:
         chromsizes_list = []
@@ -385,6 +389,9 @@ def alignment_tileset_info(file, chromsizes):
                     'max_zoom': 7
                     }
     """
+    if isinstance(file, str):
+        file = open(file, "rb")
+
     if chromsizes is not None:
         chromsizes_list = []
 
@@ -457,6 +464,14 @@ def alignment_tiles(
     tile_list: [(tile_id, tile_data),...]
         A list of tile_id, tile_data tuples
     """
+    if index_file is None:
+        if isinstance(file, str):
+            index_file = file + ".bai"
+        else:
+            raise ValueError(
+                "A file pointer is provided without an index file. "
+                "Please specify an index file"
+            )
     generated_tiles = []
     tsinfo = alignment_tileset_info(file, chromsizes)
 

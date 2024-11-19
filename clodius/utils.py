@@ -79,7 +79,7 @@ def get_file_compression(f) -> str:
     :param f: The file pointer
     :returns: The compression type."""
     magic_dict = {
-        b"\x1f\x8b\x08": "gz",
+        b"\x1f\x8b\x08": "gzip",
         b"\x42\x5a\x68": "bz2",
         b"\x50\x4b\x03\x04": "zip",
         b"\xfd\x37\x7a\x58\x5a\x00": "xz",
@@ -92,11 +92,11 @@ def get_file_compression(f) -> str:
     f.seek(prev_pos)
 
     for magic, filetype in magic_dict.items():
-        print("l", len(file_start), "file_start", file_start)
+        # print("l", len(file_start), "file_start", file_start)
         if file_start.startswith(magic):
             return filetype
 
-    return "no match"
+    return None
 
 
 TILE_OPTIONS_CHAR = ","

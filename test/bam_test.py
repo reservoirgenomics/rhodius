@@ -38,9 +38,9 @@ class MyTestCase(unittest.TestCase):
         assert len(tile) > 0
 
         # missing index
-        self.assertRaises(ValueError, ctb.tiles, filename_mismatched, ["x.9.0"])
+        self.assertRaises(FileNotFoundError, ctb.tiles, filename_mismatched, ["x.9.0"])
 
-        tile = ctb.tiles(filename_mismatched, ["x.9.0"], index_filename=index_filename)
+        tile = ctb.tiles(filename_mismatched, ["x.9.0"], index_file=index_filename)
 
         assert len(tile) > 0
         # example tile: [('x.9.0', { id: [....]})]
@@ -49,7 +49,7 @@ class MyTestCase(unittest.TestCase):
         tile = ctb.tiles(
             filename_mismatched,
             ["x.9.0"],
-            index_filename=index_filename,
+            index_file=index_filename,
             max_tile_width=10,
         )
 

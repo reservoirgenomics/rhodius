@@ -6,6 +6,16 @@ import clodius.tiles.bedfile as ctb
 from unittest.mock import MagicMock
 
 
+def test_gzip_tiles():
+    valid_filename = op.join("data", "regions.valid.bed.1.gz")
+    chromsizes_fn = op.join("data", "chm13v1.chrom.sizes")
+
+    chromsizes = cc.chromsizes_as_series(chromsizes_fn)
+    tiles = ctb.tiles(valid_filename, ["x.0.0"], chromsizes, index_filename=None)
+
+    assert len(tiles) > 0
+
+
 def test_bed_tiles():
     valid_filename = op.join("data", "regions.valid.bed")
     invalid_filename = op.join("data", "regions.spaces.bed")

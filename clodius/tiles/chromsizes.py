@@ -32,6 +32,9 @@ def get_tsv_chromsizes(file):
     chromsizes: [(name:string, size:int), ...]
         An ordered list of chromosome names and sizes
     """
+    if isinstance(file, str):
+        file = open(file, "rb")
+
     try:
         file.seek(0)
         binary_data = file.read()

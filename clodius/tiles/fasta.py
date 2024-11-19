@@ -82,6 +82,9 @@ def multivec_tiles(*args, **kwargs):
 
 
 def read_fai(fai_file):
+    if isinstance(fai_file, str):
+        fai_file = open(fai_file, "rb")
+
     fai_index = {}
     fai_file.seek(0)
     binary_data = fai_file.read()
@@ -99,6 +102,9 @@ def read_fai(fai_file):
 
 
 def fetch_sequence(fasta_file, fai_index, seq_name, start, end):
+    if isinstance(fasta_file, str):
+        fasta_file = open(fasta_file, "rb")
+
     if seq_name not in fai_index:
         raise ValueError(f"Sequence {seq_name} not found in index")
 

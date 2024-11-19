@@ -93,6 +93,12 @@ def get_chromsizes(bwpath):
     Also, return NaNs from any missing chromosomes in bbi.fetch
 
     """
+    if not isinstance(bwpath, str):
+        # we already have a file pointer
+        bwpath = bwpath
+    else:
+        bwpath = open(bwpath, "rb")
+
     bwpath.seek(0)
     f = pybigtools.open(bwpath)
     chromsizes = f.chroms()
@@ -178,7 +184,10 @@ def fetch_data(a):
     x = np.zeros((n_bins, n_dim)) if n_dim > 1 else np.zeros(n_bins)
 
     if not isinstance(bwpath, str):
-        bwpath.seek(0)
+        # we already have a file pointer
+        bwpath = bwpath
+    else:
+        bwpath = open(bwpath, "rb")
 
     bwpath.seek(0)
     b = pybigtools.open(bwpath)

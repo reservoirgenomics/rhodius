@@ -105,7 +105,7 @@ def test_tileset_info():
 
     tileset_info = hgbi.tileset_info(filename)
 
-    assert len(tileset_info["aggregation_modes"]) == 4
+    assert len(tileset_info["aggregation_modes"]) == 5
     assert tileset_info["aggregation_modes"]["mean"]
     assert tileset_info["aggregation_modes"]["min"]
     assert tileset_info["aggregation_modes"]["max"]

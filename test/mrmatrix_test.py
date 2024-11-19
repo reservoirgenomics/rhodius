@@ -109,9 +109,9 @@ class TilesTest(unittest.TestCase):
         tileset = MockHdf5(
             {
                 "resolutions": {
-                    "1": {"values": np.array([[1, 2], [3, 4]])},
-                    "5": {"values": np.array([[3, 4], [5, 6]])},
-                    "11": {"values": np.array([[5, 6], [7, 8]])},
+                    "1": {"values": np.array([[1.0, 2], [3, 4]])},
+                    "5": {"values": np.array([[3.0, 4], [5, 6]])},
+                    "11": {"values": np.array([[5.0, 6], [7, 8]])},
                 }
             }
         )

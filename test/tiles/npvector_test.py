@@ -3,7 +3,7 @@ import clodius.tiles.npvector as hgnv
 
 
 def test_npvector():
-    array = np.array(range(100))
+    array = np.array([float(i) for i in range(100)])
     # print('ts:', hgnv.tileset_info(array))
     assert "max_width" in hgnv.tileset_info(array)
 

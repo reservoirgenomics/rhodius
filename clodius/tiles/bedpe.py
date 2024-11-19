@@ -9,6 +9,7 @@ from pandas.errors import EmptyDataError
 
 import clodius.tiles.tabix as ctt
 from clodius.utils import TILE_OPTIONS_CHAR
+from clodius.utils import get_file_compression
 
 # import pysam
 import slugid
@@ -54,23 +55,30 @@ def tileset_info(filename, chromsizes=None):
     that the file is enormous (e.g. has a width of 4 trillion) and rely on the
     browser to pass in a set of chromsizes
     """
+    if isinstance(filename, str):
+        filename = open(filename, "rb")
+
+    compression = get_file_compression(filename)
 
     # do this so that we can serialize the int64s in the numpy array
     chromsizes_list = []
 
     t = pd.read_csv(
-        filename,
-        nrows=2,
-        sep="\t",
-        comment="#",
-        header=None,
+        filename, nrows=2, sep="\t", comment="#", header=None, compression=compression
     )
 
     header = ""
 
     try:
+        filename.seek(0)
         t_head = pd.read_csv(
-            filename, nrows=2, sep="\t", comment="#", header=None, skiprows=1
+            filename,
+            nrows=2,
+            sep="\t",
+            comment="#",
+            header=None,
+            skiprows=1,
+            compression=compression,
         )
 
         if (t.dtypes == t_head.dtypes).all():
@@ -132,6 +140,11 @@ def ts_hash(filename, chromsizes):
 
 def bedpe_to_df(filename, chromsizes, tsinfo):
     """Prepare the bedpe file so that we can query it."""
+    if isinstance(filename, str):
+        filename = open(filename, "rb")
+
+    compression = get_file_compression(filename)
+
     hash_ = ts_hash(filename, chromsizes)
 
     # hash the loaded data table so that we don't have to read the entire thing
@@ -153,6 +166,7 @@ def bedpe_to_df(filename, chromsizes, tsinfo):
         comment="#",
         sep="\t",
         skiprows=skiprows,
+        compression=compression,
     )
 
     cache.set(hash_, t)

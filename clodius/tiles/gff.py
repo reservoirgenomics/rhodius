@@ -4,17 +4,27 @@ import random
 import clodius.tiles.bedfile as ctb
 import pandas as pd
 
+from clodius.utils import get_file_compression
+
 
 def gff_chromsizes(filename):
     """Use the "regions" sections of a GFF file as the chromsizes."""
+    if isinstance(filename, str):
+        filename = open(filename, "rb")
+
     t = pd.read_csv(
-       filename, header=None, delimiter="\t", comment='#', compression=ctb.get_compression(filename)
+        filename,
+        header=None,
+        delimiter="\t",
+        comment="#",
+        compression=get_file_compression(filename),
     )
-    regions = t[t[2] == 'region']
+    regions = t[t[2] == "region"]
     return pd.Series(regions[4].values, index=regions[0])
 
+
 def row_to_bedlike(row, css, orig_columns):
-    attrs = dict([x.split('=') for x in row[8].split(';')])
+    attrs = dict([x.split("=") for x in row[8].split(";")])
 
     ret = {
         "uid": row["ix"],
@@ -22,10 +32,11 @@ def row_to_bedlike(row, css, orig_columns):
         "xEnd": row["xEnd"],
         "chrOffset": css[row[0]],
         "importance": random.random(),
-        "fields": [row[0], row[3], row[4], attrs['Name'], '-', row[6]],
+        "fields": [row[0], row[3], row[4], attrs["Name"], "-", row[6]],
     }
 
     return ret
+
 
 def tileset_info(filename, chromsizes=None, index_filename=None):
     """
@@ -42,7 +53,11 @@ def tileset_info(filename, chromsizes=None, index_filename=None):
 
     return ctb.tileset_info(filename, chromsizes, index_filename)
 
+
 def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
+    if isinstance(filename, str):
+        filename = open(filename, "rb")
+
     hash_ = ctb.ts_hash(filename, chromsizes)
 
     if settings is None:
@@ -53,9 +68,13 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
 
     if val is None:
         t = pd.read_csv(
-            filename, comment='#', header=None, delimiter="\t", compression=ctb.get_compression(filename)
+            filename,
+            comment="#",
+            header=None,
+            delimiter="\t",
+            compression=get_file_compression(filename),
         )
-        t = t[t[2] == 'gene']
+        t = t[t[2] == "gene"]
 
         orig_columns = t.columns
         css = chromsizes.cumsum().shift().fillna(0).to_dict()
@@ -74,8 +93,8 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
     orig_columns = val["orig_columns"]
     css = val["css"]
 
-    tileStart = x * tsinfo["max_width"] / 2 ** z
-    tileEnd = (x + 1) * tsinfo["max_width"] / 2 ** z
+    tileStart = x * tsinfo["max_width"] / 2**z
+    tileEnd = (x + 1) * tsinfo["max_width"] / 2**z
 
     t = t.query(f"xEnd >= {tileStart} & xStart <= {tileEnd}")
     MAX_PER_TILE = settings.get("MAX_BEDFILE_ENTRIES") or 1024
@@ -87,8 +106,16 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
     )
     return list(ret.values)
 
+
 def tiles(filename, tile_ids, chromsizes=None, index_filename=None, settings=None):
     if chromsizes is None:
         chromsizes = gff_chromsizes(filename)
 
-    return ctb.tiles(filename, tile_ids, chromsizes, index_filename, settings, single_tile_func = single_tile)
+    return ctb.tiles(
+        filename,
+        tile_ids,
+        chromsizes,
+        index_filename,
+        settings,
+        single_tile_func=single_tile,
+    )
