@@ -238,7 +238,7 @@ def get_bedfile_values(filename, chromsizes, settings):
         t["xStart"] = t["chromStart"] + t[1]
 
         if settings.get("filetype") == "vcf":
-            t["xEnd"] = t["chromStart"] + len(t[3])
+            t["xEnd"] = t["chromStart"] + t[1] + len(t[3])
         else:
             t["xEnd"] = t["chromStart"] + t[2]
         t["ix"] = t.index
