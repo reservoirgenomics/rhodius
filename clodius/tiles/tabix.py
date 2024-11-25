@@ -48,17 +48,20 @@ def load_tbi_idx(index_filename):
     go through it and get a sense of how much data will be
     retrieved by a query."""
 
+
+def load_tbi_idx(index_filename):
+    """Load a reduced version of a tabix index so that we can
+    go through it and get a sense of how much data will be
+    retrieved by a query."""
     if isinstance(index_filename, str):
         f = open(index_filename, "rb")
     else:
         f = index_filename
 
     f.seek(0)
-    ba = bytearray(f.read())
 
-    # The 15 + 32 comes from https://stackoverflow.com/a/6124315
-    # Without that parameter lib complains about zlib.error: Error -3 while decompressing data: incorrect header check
-    b = zlib.decompress(ba, 15 + 32)
+    with gzip.GzipFile(fileobj=f, mode="rb") as gz:
+        b = gz.read()
 
     [
         _,
