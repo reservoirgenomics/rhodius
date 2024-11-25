@@ -171,14 +171,20 @@ def single_indexed_tile(
 
     for row in res:
         parts = row
+        if settings.get("filetype") == "vcf":
+            xEnd = css[parts[0]] + int(parts[1]) + len(parts[3])
+        else:
+            xEnd = css[parts[0]] + int(parts[2])
+
         ret = {
             "uid": hashlib.md5("\t".join(row).encode("utf-8")).hexdigest(),
             "xStart": css[parts[0]] + int(parts[1]),
-            "xEnd": css[parts[0]] + int(parts[2]),
+            "xEnd": xEnd,
             "chrOffset": css[parts[0]],
             "importance": random.random(),
             "fields": parts,
         }
+
         formatted += [ret]
 
     return formatted
