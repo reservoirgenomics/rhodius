@@ -317,7 +317,6 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
         results["to"] = list(reads_df["end"])
         results["chrName"] = list(reads_df["rname"])
         results["chrOffset"] = [chr_offset] * num_reads
-        results["cigars"] = list(reads_df["cigar"])
 
         results["id"] = [
             name if not is_paired else (f"{name}_1" if first else f"{name}_2")
@@ -325,6 +324,7 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
                 reads_df["qname"], results["first_seq"], results["is_paired"]
             )
         ]
+        results["readName"] = list(reads_df["qname"])
 
         if "HP" not in reads_df:
             results["tags.HP"] = [0] * num_reads
