@@ -43,7 +43,6 @@ class MyTestCase(unittest.TestCase):
         tile = ctb.tiles(filename_mismatched, ["x.9.0"], index_file=index_filename)
 
         assert len(tile) > 0
-        # example tile: [('x.9.0', { id: [....]})]
         assert len(tile[0][1]["id"]) > 10
 
         tile = ctb.tiles(
