@@ -2,14 +2,18 @@ import json
 import math
 
 import numpy as np
+import pandas as pd
 
 import clodius.tiles.bigwig as ctbw
 from clodius.tiles.tabix import est_query_size_ix, load_bai_index
 from clodius.tiles.utils import abs2genomic
 from clodius.utils import TILE_OPTIONS_CHAR
+import logging
 
 import oxbow as ox
 import polars as pl
+
+logger = logging.getLogger(__name__)
 
 
 def get_cigar_substitutions(pos, query_length, cigartuples):
@@ -187,6 +191,91 @@ def variants_list(seq, ref, pos, cigar):
     return variants
 
 
+def get_reads_df(file, index_file, chromosome, start, end):
+    """Get reads in a chromosome range."""
+    from time import time
+
+    logger.info("Getting reads for %s:%d-%d", chromosome, start, end)
+    file.seek(0)
+    index_file.seek(0)
+
+    region = f"{chromosome}:{start}-{end}"
+
+    t1 = time()
+
+    ipc = ox.read_bam(file, region, index=index_file)
+    t2 = time()
+    print(f"Reading BAM: {t2 - t1:.2f}")
+    reads_df = pl.read_ipc(ipc).to_pandas()
+    t3 = time()
+    print(f"Reading reading ipc: {t3 - t2:.2f}")
+
+    reads_df["is_paired"] = reads_df["flag"] & 1
+    reads_df["id"] = (
+        reads_df["qname"].astype(str)
+        + "_"
+        + reads_df["rname"].astype(str)
+        + "_"
+        + reads_df["pos"].astype(str)
+        + "_"
+        + reads_df["end"].astype(str)
+    )
+    return reads_df
+
+
+def need_mates(df):
+    """Which reads in a read dataframe need mates.
+
+    The reads that need mates are the ones that have less than 2 pair.
+    """
+    qname_counts = df.query("is_paired == True", engine="python")[
+        "qname"
+    ].value_counts()
+
+    return df[df["qname"].isin(qname_counts[qname_counts < 2].index)]
+
+
+def get_paired_reads(file, index_file, chromosome, start, end):
+    """Get reads and their mates for a chromosome range.
+
+    All mate pairs have to be on the same chromosome. Mates that are on different
+    chromosomes will be ignored.
+    """
+    # The the single ended reads in the interval
+    reads_df = get_reads_df(file, index_file, chromosome, start, end)
+
+    # See which reads need to have their mates picked up.
+    nm = need_mates(reads_df)
+    mates = dict(nm[["qname", "id"]].values)
+
+    for i, row in nm.iterrows():
+        if row["qname"] not in mates:
+            # We've already found a mate for this read
+            continue
+
+        logger.info("Fetching pairs. Mates left: %d", len(mates.keys()))
+        new_reads = get_reads_df(
+            file, index_file, row["rnext"], row["pnext"], row["pnext"] + 1
+        )
+        new_reads = new_reads[new_reads["qname"].isin(mates.keys())]
+
+        to_keep_ixs = []
+
+        for j, read in new_reads.iterrows():
+            if read["id"] != mates[read["qname"]]:
+                # We've found a mate
+                to_keep_ixs += [True]
+                del mates[read["qname"]]
+            else:
+                to_keep_ixs += [False]
+
+        to_keep = new_reads[to_keep_ixs]
+
+        reads_df = pd.concat([reads_df, to_keep])
+
+    return reads_df
+
+
 def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache=None):
     """
     Sample reads from the specified region, assuming that the chromosomes
@@ -253,10 +342,6 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
         "chrName": [],
         "chrOffset": [],
         "cigar": [],
-        "m1From": [],
-        "m1To": [],
-        "m2From": [],
-        "m2To": [],
         "mapq": [],
         "tags.HP": [],
         "strand": [],
@@ -292,14 +377,9 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
         if start == 0:
             start = 1
 
-        file.seek(0)
-        index_file.seek(0)
-        # ipc = ox.read_bam(
-        #     file, f"{seq_name}:{start}-{end}", index=index_file, tags=set(["MD", "HP"])
-        # )
-        region = f"{seq_name}:{start}-{end}"
-        ipc = ox.read_bam(file, region, index=index_file)
-        reads_df = pl.read_ipc(ipc)
+        reads_df = get_paired_reads(
+            file=file, index_file=index_file, chromosome=seq_name, start=start, end=end
+        )
         # We can drastically speed these functions up by coding them in Rust in oxbow
         results["cigars"] = [
             get_cigar_substitutions(pos - 1, end - pos, parse_cigar_string(cigar))
@@ -317,6 +397,7 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
         results["to"] = list(reads_df["end"])
         results["chrName"] = list(reads_df["rname"])
         results["chrOffset"] = [chr_offset] * num_reads
+        results["readName"] = list(reads_df["qname"])
 
         results["id"] = [
             name if not is_paired else (f"{name}_1" if first else f"{name}_2")
@@ -324,7 +405,6 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
                 reads_df["qname"], results["first_seq"], results["is_paired"]
             )
         ]
-        results["readName"] = list(reads_df["qname"])
 
         if "HP" not in reads_df:
             results["tags.HP"] = [0] * num_reads
