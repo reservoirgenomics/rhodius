@@ -205,10 +205,9 @@ def get_reads_df(file, index_file, chromosome, start, end):
 
     ipc = ox.read_bam(file, region, index=index_file)
     t2 = time()
-    print(f"Reading BAM: {t2 - t1:.2f}")
+    logger.info(f"Reading BAM: %.2f", t2 - t1)
     reads_df = pl.read_ipc(ipc).to_pandas()
     t3 = time()
-    print(f"Reading reading ipc: {t3 - t2:.2f}")
 
     reads_df["is_paired"] = reads_df["flag"] & 1
     reads_df["id"] = (
@@ -222,58 +221,73 @@ def get_reads_df(file, index_file, chromosome, start, end):
     )
     return reads_df
 
-
-def need_mates(df):
-    """Which reads in a read dataframe need mates.
-
-    The reads that need mates are the ones that have less than 2 pair.
-    """
-    qname_counts = df.query("is_paired == True", engine="python")[
-        "qname"
-    ].value_counts()
-
-    return df[df["qname"].isin(qname_counts[qname_counts < 2].index)]
-
-
 def get_paired_reads(file, index_file, chromosome, start, end):
     """Get reads and their mates for a chromosome range.
 
     All mate pairs have to be on the same chromosome. Mates that are on different
     chromosomes will be ignored.
     """
-    # The the single ended reads in the interval
-    reads_df = get_reads_df(file, index_file, chromosome, start, end)
+    logger.info("getting paired reads: %s %d %d", chromosome, start, end)
 
-    # See which reads need to have their mates picked up.
-    nm = need_mates(reads_df)
-    mates = dict(nm[["qname", "id"]].values)
+    # Iterative mate resolution takes 1.44s
+    MATE_EXTENSION = 500
 
-    for i, row in nm.iterrows():
-        if row["qname"] not in mates:
-            # We've already found a mate for this read
-            continue
+    # The the single ended reads in slightly wider interval
+    # so that we can pick up mates in one go
+    df_pre = get_reads_df(file, index_file, chromosome,
+                      start - MATE_EXTENSION, start)
+    df_post = get_reads_df(file, index_file, chromosome,
+                      end, end + MATE_EXTENSION)
+    
+    df = get_reads_df(file, index_file, chromosome,
+                      start, end)
+    df_all = pd.concat([df, df_pre, df_post])
+    # df_all = pd.concat([df])
 
-        logger.info("Fetching pairs. Mates left: %d", len(mates.keys()))
+    qnames = set(df['qname'])
+    df = df_all[df_all['qname'].isin(qnames)]
+
+    # Find which reads we have the first and last mates for
+    firsts = set(df[df['flag'] & 64 > 0]['qname'])
+    lasts = set(df[df['flag'] & 128 > 0]['qname'])
+
+    needs_mates =  df[~df['qname'].isin(firsts & lasts)]
+
+    counter = 1
+    while len(needs_mates):
+        row = needs_mates.iloc[0]
+        
+        # Fetch the mate for this read. This will fetch a bunch of other
+        # reads in the mate's interval as well
+        # print('fetching', row['pnext'])
         new_reads = get_reads_df(
             file, index_file, row["rnext"], row["pnext"], row["pnext"] + 1
         )
-        new_reads = new_reads[new_reads["qname"].isin(mates.keys())]
 
-        to_keep_ixs = []
+        # In order to filter out the reads that we are not expecting
+        # we'll calculate the current set of incomplete reads as the
+        # reads that we have either a first or last but not both
+        incomplete_reads  = (firsts | lasts) - (firsts & lasts)
+        # print(incomplete_reads)
 
-        for j, read in new_reads.iterrows():
-            if read["id"] != mates[read["qname"]]:
-                # We've found a mate
-                to_keep_ixs += [True]
-                del mates[read["qname"]]
-            else:
-                to_keep_ixs += [False]
+        # We'll keep the reads that match our list of incomplete read names
+        to_keep = new_reads[new_reads['qname'].isin(incomplete_reads)]
 
-        to_keep = new_reads[to_keep_ixs]
+        # Add the new reads to the list of firsts and lasts
+        new_firsts = set(to_keep[to_keep['flag'] & 64 > 0]['qname'])
+        new_lasts = set(to_keep[to_keep['flag'] & 128 > 0]['qname'])
 
-        reads_df = pd.concat([reads_df, to_keep])
+        firsts = new_firsts | firsts
+        lasts = new_lasts | lasts
 
-    return reads_df
+        df = pd.concat([df, to_keep])
+
+        needs_mates =  df[~df['qname'].isin(firsts & lasts)]
+
+        counter += 1
+    logger.info("Number of paired end refetches: %d", counter)
+
+    return df
 
 
 def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache=None):
