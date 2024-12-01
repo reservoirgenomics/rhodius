@@ -147,6 +147,10 @@ def variants_list(seq, ref, pos, cigar):
     i_ref = 0
     variants = []
 
+    if not seq:
+        logger.warning("No seq found for pos %d", pos)
+        return []
+
     for i_cig in range(len(cigar)):
         if cigar[i_cig].isnumeric():
             # getting the number of bases the upcoming operation applies to
@@ -208,6 +212,19 @@ def get_reads_df(file, index_file, chromosome, start, end):
     logger.info(f"Reading BAM: %.2f", t2 - t1)
     reads_df = pl.read_ipc(ipc).to_pandas()
     t3 = time()
+
+    # Exclude secondary and supplementary alignments
+    # When we decide to handle them, we'll need to fetch
+    # the primary read for secondary alignments in order
+    # to get the "seq" field which is omitted in secondary
+    # alignments
+    reads_df = reads_df[~((reads_df['flag'] & 0x100 > 0) |
+                        (reads_df['flag'] & 0x800 > 0))]
+
+    # for i, row in reads_df.iterrows():
+    #     print("pos", row['pos'], "secondary",
+    #           row['flag'] & 0x100, "supplementary",
+    #           row['flag'] & 0x800,  "seq len", len(row['seq']))
 
     reads_df["is_paired"] = reads_df["flag"] & 1
     reads_df["id"] = (
