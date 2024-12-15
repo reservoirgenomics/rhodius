@@ -82,6 +82,7 @@ def reconstruct_ref(seq, md, cigar):
     l = 0
 
     new_seq = ""
+    ref_seq = []
 
     # go through the cigar and remove the ignored bases
     for i_cig in range(len(cigar)):
@@ -90,28 +91,50 @@ def reconstruct_ref(seq, md, cigar):
             l = l * 10 + int(cigar[i_cig])
         else:
             op = cigar[i_cig]
-            if op == "S" or op == "I":
+            # print("op", l, op, 'iseq:', i_seq)
+            if op == 'S':
                 i_seq += l
-            else:
+            elif op == "I":
+                ref_seq += ['-'] * l
                 new_seq += seq[i_seq : i_seq + l]
+                i_seq += l
+            elif op == 'M':
+                new_seq += seq[i_seq : i_seq + l]
+                ref_seq += list(seq[i_seq : i_seq + l])
+                i_seq += l
+            elif op == 'D':
+                ref_seq += ['N'] * l
+                new_seq += '-' * l
 
             l = 0
             i_cig += 1
 
+    # print(ref_seq)
+    # print(new_seq)
+
     i_seq = 0
-    seq = new_seq
+
+
+    i_ref = 0
 
     # let's iterate over the entire md string
     for i_md in range(len(md)):
         # if we encounter a numeric value then we keep track of what it is
         if md[i_md].isnumeric():
             match_count = match_count * 10 + int(md[i_md])
-            # We're definitely no in a deletion if we're in a numeric number
+            # We're definitely not in a deletion if we're in a numeric number
             deletion = False
         else:
             # Add the matches that we've gone over
             # If we've been going over a deletion or mismatches, then match_count will be 0
-            ref += seq[i_seq : i_seq + match_count]
+            # ref += seq[i_seq : i_seq + match_count]
+            i_ref += match_count
+            # print("readding", i_seq, match_count)
+            # print(oseq)
+            # print('--------')
+            # print(ref)
+            # print('==========')
+
             i_seq += match_count
             match_count = 0
 
@@ -124,28 +147,58 @@ def reconstruct_ref(seq, md, cigar):
 
                 if deletion:
                     # It's a deletion in the reference
-                    ref += md[i_md]
+                    # ref += md[i_md]
+                    ref_seq[i_ref] = md[i_md]
+                    i_ref += 1
                 else:
                     # It's a mismatch, add the MD letter and skip the sequence letter
-                    ref += md[i_md]
+                    # ref += md[i_md]
+                    ref_seq[i_ref] = md[i_md]
+                    i_ref += 1
                     i_seq += 1
 
     # Add the last match_count stretch
-    ref += seq[i_seq : i_seq + match_count]
-    return ref
+    # ref += seq[i_seq : i_seq + match_count]
+    # print("readding", i_seq, match_count)
+    # print(oseq)
+    # print('--------')
+    # print(ref)
+    # print('==========')
+    return "".join(ref_seq), new_seq
 
 
-def variants_list(seq, ref, pos, cigar):
+def variants_list(ref, seq):
     """Get a list of variants that are in seq relative to ref
 
     Returns:
-        A list of (query_pos, ref_pos, query_base) pairs.
+        A list of 0-based (query_pos, ref_pos, query_base) pairs.
     """
     l = 0
     i_cig = 0
     i_seq = 0
     i_ref = 0
     variants = []
+
+    assert len(seq) == len(ref)
+
+    ref_pos = 0
+    seq_pos = 0
+
+    for i in range(len(seq)):
+        if ref[i] == '-':
+            seq_pos += 1
+            continue
+        if seq[i] == '-':
+            ref_pos += 1
+            continue
+
+        seq_pos += 1
+        ref_pos += 1
+
+        if seq[i] != ref[i]:
+            variants += [(seq_pos-1, ref_pos-1, seq[i])]
+
+    return variants
 
     if not seq:
         logger.warning("No seq found for pos %d", pos)
@@ -157,10 +210,10 @@ def variants_list(seq, ref, pos, cigar):
             l = l * 10 + int(cigar[i_cig])
         else:
             op = cigar[i_cig]
-            # print("l", l, "op", op)
+            # print("op", l, op, 'iseq:', i_seq)
             if op == "M" or op == "=" or op == "X":
                 # Match or mismatch
-                # print("l:", l, "op", op)
+                # print(seq[i_seq: i_seq+l], ref[i_ref: i_ref + l])
                 for j in range(l):
                     # print(
                     #     "comparing",
@@ -178,15 +231,60 @@ def variants_list(seq, ref, pos, cigar):
                         #     seq[i_seq + j],
                         #     ref_with_insertions[i_ref + j],
                         # )
+                        print("adding variant", (i_seq + j, seq[i_seq + j], ref[i_ref + j]))
                         variants += [(i_seq + j, pos + i_ref + j - 1, seq[i_seq + j])]
 
+# target            5 CTGCCTCAGTCTCCCAAGTAGCTGGGATTACAGGCGTTCACCACTACCACCTGGCTAATT
+#                   0 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+# query             0 CTGCCTCAGTCTCCCAAGTAGCTGGGATTACAGGCGTTCACCACTACCACCTGGCTAATT
+
+# target           65 TTTGTATTTCTAGTAGCGACGGAGTTTTGCCATGTTGGCCAGG----TCTCAAACTCCTG
+#                  60 |||||||||||||||||||||||||||||||||||||||||||----||||.||||||||
+# query            60 TTTGTATTTCTAGTAGCGACGGAGTTTTGCCATGTTGGCCAGGCTGATCTCGAACTCCTG
+
+# target          121 ACCTCAGGTGATCCACCCACCTCGGCCTCCCAAAGTGCTGGGATTACAGGCATGAGCCAC
+#                 120 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+# query           120 ACCTCAGGTGATCCACCCACCTCGGCCTCCCAAAGTGCTGGGATTACAGGCATGAGCCAC
+
+# target          181 CGCGCCTGGCCCACTTTTGTC-TTTGTTTGAAGTT-CCTGTAATAAAAGTTTCAGCTC-T
+#                 180 |||||||||||||||||||||-|||||||||||||-|||||||||||||.|.||||||-|
+# query           180 CGCGCCTGGCCCACTTTTGTCTTTTGTTTGAAGTTCCCTGTAATAAAAGCTGCAGCTCGT
+
+# target          238 ATATTAATATCCCCCCACACAAAT-------AAGCGGC--CTCTGACCC---CCACGTTC
+#                 240 |.|.|.||||||||.|...|...|-------||||.||--|||||||||---|.|.|.||
+# query           240 ACACTCATATCCCCGCGGGCTGGTGCTCTGCAAGCTGCGTCTCTGACCCTCTCAATGCTC
+
+# op 5 S iseq: 0
+# op 103 M iseq: 5
+# CTGCCTCAGTCTCCCAAGTAGCTGGGATTACAGGCGTTCACCACTACCACCTGGCTAATTTTTGTATTTCTAGTAGCGACGGAGTTTTGCCATGTTGGCCAGG CTGCCTCAGTCTCCCAAGTAGCTGGGATTACAGGCGTTCACCACTACCACCTGGCTAATTTTTGTATTTCTAGTAGCGACGGAGTTTTGCCATGTTGGCCAGG
+# op 4 D iseq: 108
+# op 94 M iseq: 108
+# TCTCAAACTCCTGACCTCAGGTGATCCACCCACCTCGGCCTCCCAAAGTGCTGGGATTACAGGCATGAGCCACCGCGCCTGGCCCACTTTTGTC TCTCGAACTCCTGACCTCAGGTGATCCACCCACCTCGGCCTCCCAAAGTGCTGGGATTACAGGCATGAGCCACCGCGCCTGGCCCACTTTTGTC
+# adding variant (112, 'A', 'G')
+# op 1 D iseq: 202
+# op 13 M iseq: 202
+# TTTGTTTGAAGTT TTTGTTTGAAGTT
+# op 1 D iseq: 215
+# op 22 M iseq: 215
+# CCTGTAATAAAAGTTTCAGCTC CCTGTAATAAAAGCTGCAGCTC
+# adding variant (228, 'T', 'C')
+# adding variant (230, 'T', 'G')
+# op 1 D iseq: 237
+# op 4 M iseq: 237
+# TATA TACA
+# adding variant (239, 'T', 'C')
+# op 2 I iseq: 241
+# op 13 M iseq: 243
+# AATATCCCCCCAC CTCATATCCCCGC
                 i_seq += l
                 i_ref += l
             elif op == "I" or op == "S":
+                # print("insertion", l)
                 i_seq += l
             elif op == "D":
                 # The query has had deletions from the reference added to it so we have to skip
                 # them in the reference
+                # print("deletion", l)
                 i_ref += l
             l = 0
 
@@ -476,7 +574,7 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
             results["variants"] = [
                 (
                     variants_list(
-                        iseq, reconstruct_ref(iseq, imd, icigar), ipos, icigar
+                        *reconstruct_ref(iseq, imd, icigar)
                     )
                     if imd
                     else []
