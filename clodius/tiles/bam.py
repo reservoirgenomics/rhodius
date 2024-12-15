@@ -173,10 +173,6 @@ def variants_list(ref, seq):
     Returns:
         A list of 0-based (query_pos, ref_pos, query_base) pairs.
     """
-    l = 0
-    i_cig = 0
-    i_seq = 0
-    i_ref = 0
     variants = []
 
     assert len(seq) == len(ref)
@@ -199,99 +195,6 @@ def variants_list(ref, seq):
             variants += [(seq_pos-1, ref_pos-1, seq[i])]
 
     return variants
-
-    if not seq:
-        logger.warning("No seq found for pos %d", pos)
-        return []
-
-    for i_cig in range(len(cigar)):
-        if cigar[i_cig].isnumeric():
-            # getting the number of bases the upcoming operation applies to
-            l = l * 10 + int(cigar[i_cig])
-        else:
-            op = cigar[i_cig]
-            # print("op", l, op, 'iseq:', i_seq)
-            if op == "M" or op == "=" or op == "X":
-                # Match or mismatch
-                # print(seq[i_seq: i_seq+l], ref[i_ref: i_ref + l])
-                for j in range(l):
-                    # print(
-                    #     "comparing",
-                    #     i_seq + j,
-                    #     seq[i_seq + j],
-                    #     i_ref + j,
-                    #     ref[i_ref + j],
-                    # )
-
-                    if seq[i_seq + j] != ref[i_ref + j]:
-                        # print(
-                        #     "mm",
-                        #     i_seq + j,
-                        #     i_ref + j,
-                        #     seq[i_seq + j],
-                        #     ref_with_insertions[i_ref + j],
-                        # )
-                        print("adding variant", (i_seq + j, seq[i_seq + j], ref[i_ref + j]))
-                        variants += [(i_seq + j, pos + i_ref + j - 1, seq[i_seq + j])]
-
-# target            5 CTGCCTCAGTCTCCCAAGTAGCTGGGATTACAGGCGTTCACCACTACCACCTGGCTAATT
-#                   0 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
-# query             0 CTGCCTCAGTCTCCCAAGTAGCTGGGATTACAGGCGTTCACCACTACCACCTGGCTAATT
-
-# target           65 TTTGTATTTCTAGTAGCGACGGAGTTTTGCCATGTTGGCCAGG----TCTCAAACTCCTG
-#                  60 |||||||||||||||||||||||||||||||||||||||||||----||||.||||||||
-# query            60 TTTGTATTTCTAGTAGCGACGGAGTTTTGCCATGTTGGCCAGGCTGATCTCGAACTCCTG
-
-# target          121 ACCTCAGGTGATCCACCCACCTCGGCCTCCCAAAGTGCTGGGATTACAGGCATGAGCCAC
-#                 120 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
-# query           120 ACCTCAGGTGATCCACCCACCTCGGCCTCCCAAAGTGCTGGGATTACAGGCATGAGCCAC
-
-# target          181 CGCGCCTGGCCCACTTTTGTC-TTTGTTTGAAGTT-CCTGTAATAAAAGTTTCAGCTC-T
-#                 180 |||||||||||||||||||||-|||||||||||||-|||||||||||||.|.||||||-|
-# query           180 CGCGCCTGGCCCACTTTTGTCTTTTGTTTGAAGTTCCCTGTAATAAAAGCTGCAGCTCGT
-
-# target          238 ATATTAATATCCCCCCACACAAAT-------AAGCGGC--CTCTGACCC---CCACGTTC
-#                 240 |.|.|.||||||||.|...|...|-------||||.||--|||||||||---|.|.|.||
-# query           240 ACACTCATATCCCCGCGGGCTGGTGCTCTGCAAGCTGCGTCTCTGACCCTCTCAATGCTC
-
-# op 5 S iseq: 0
-# op 103 M iseq: 5
-# CTGCCTCAGTCTCCCAAGTAGCTGGGATTACAGGCGTTCACCACTACCACCTGGCTAATTTTTGTATTTCTAGTAGCGACGGAGTTTTGCCATGTTGGCCAGG CTGCCTCAGTCTCCCAAGTAGCTGGGATTACAGGCGTTCACCACTACCACCTGGCTAATTTTTGTATTTCTAGTAGCGACGGAGTTTTGCCATGTTGGCCAGG
-# op 4 D iseq: 108
-# op 94 M iseq: 108
-# TCTCAAACTCCTGACCTCAGGTGATCCACCCACCTCGGCCTCCCAAAGTGCTGGGATTACAGGCATGAGCCACCGCGCCTGGCCCACTTTTGTC TCTCGAACTCCTGACCTCAGGTGATCCACCCACCTCGGCCTCCCAAAGTGCTGGGATTACAGGCATGAGCCACCGCGCCTGGCCCACTTTTGTC
-# adding variant (112, 'A', 'G')
-# op 1 D iseq: 202
-# op 13 M iseq: 202
-# TTTGTTTGAAGTT TTTGTTTGAAGTT
-# op 1 D iseq: 215
-# op 22 M iseq: 215
-# CCTGTAATAAAAGTTTCAGCTC CCTGTAATAAAAGCTGCAGCTC
-# adding variant (228, 'T', 'C')
-# adding variant (230, 'T', 'G')
-# op 1 D iseq: 237
-# op 4 M iseq: 237
-# TATA TACA
-# adding variant (239, 'T', 'C')
-# op 2 I iseq: 241
-# op 13 M iseq: 243
-# AATATCCCCCCAC CTCATATCCCCGC
-                i_seq += l
-                i_ref += l
-            elif op == "I" or op == "S":
-                # print("insertion", l)
-                i_seq += l
-            elif op == "D":
-                # The query has had deletions from the reference added to it so we have to skip
-                # them in the reference
-                # print("deletion", l)
-                i_ref += l
-            l = 0
-
-        i_cig += 1
-
-    return variants
-
 
 def get_reads_df(file, index_file, chromosome, start, end):
     """Get reads in a chromosome range."""
