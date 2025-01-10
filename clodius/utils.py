@@ -7,6 +7,11 @@ FILETYPES = {
         "extensions": [".bam"],
         "datatypes": ["reads", "alignments"],
     },
+    "chromsizes-tsv": {
+        "description": "Chromosome sizes",
+        "extensions": [".chromsizes", ".fai", ".chrom.sizes"],
+        "datatypes": ["chromsizes"],
+    },
     "cooler": {
         "description": "multi-resolution cooler file",
         "extensions": [".mcool"],
@@ -29,7 +34,7 @@ FILETYPES = {
     },
     "fasta": {
         "description": "FASTA sequence file",
-        "extensions": [".fa", ".fna"],
+        "extensions": [".fa", ".fna", ".fasta"],
         "datatypes": ["sequence"],
     },
     "gff": {

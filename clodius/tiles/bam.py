@@ -49,7 +49,7 @@ def get_cigar_substitutions(pos, query_length, cigartuples):
             subs.append((readstart - first_ctuple[1], "H", first_ctuple[1]))
 
         if last_ctuple[0] == "S":
-            subs.append((readend - last_ctuple[1], "S", last_ctuple[1]))
+            subs.append((readend + 1, "S", last_ctuple[1]))
         if last_ctuple[0] == "H":
             subs.append((readend, "H", last_ctuple[1]))
 
@@ -456,7 +456,8 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
         results["chrName"] = list(reads_df["rname"])
         results["chrOffset"] = [chr_offset] * num_reads
         results["readName"] = list(reads_df["qname"])
-
+        results['mapq'] =list(reads_df['mapq'])
+        
         results["id"] = [
             name if not is_paired else (f"{name}_1" if first else f"{name}_2")
             for name, first, is_paired in zip(
