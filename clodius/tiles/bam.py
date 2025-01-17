@@ -208,6 +208,7 @@ def get_reads_df(file, index_file, chromosome, start, end):
 
     t1 = time()
 
+    print("region", region)
     ipc = ox.read_bam(file, region, index=index_file)
     t2 = time()
     logger.info(f"Reading BAM: %.2f", t2 - t1)
@@ -255,7 +256,7 @@ def get_paired_reads(file, index_file, chromosome, start, end):
     # The the single ended reads in slightly wider interval
     # so that we can pick up mates in one go
     df_all = get_reads_df(
-        file, index_file, chromosome, start - MATE_EXTENSION, end + MATE_EXTENSION
+        file, index_file, chromosome, max(1, start - MATE_EXTENSION), end + MATE_EXTENSION
     )
 
     df = df_all[(df_all["pos"] <= end + 1) & (df_all["end"] >= start - 1)]
@@ -448,6 +449,8 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
 
         num_reads = len(reads_df)
 
+        strands = {0: '+', 16: '-'}
+
         results["first_seq"] = list(reads_df["flag"] & 64)
         results["last_seq"] = list(reads_df["flag"] & 128)
         results["is_paired"] = list(reads_df["flag"] & 1)
@@ -457,6 +460,7 @@ def load_reads(file, start_pos, end_pos, chromsizes=None, index_file=None, cache
         results["chrOffset"] = [chr_offset] * num_reads
         results["readName"] = list(reads_df["qname"])
         results['mapq'] =list(reads_df['mapq'])
+        results['strand'] = [strands[x] for x in list(reads_df['flag'] & 16)]
         
         results["id"] = [
             name if not is_paired else (f"{name}_1" if first else f"{name}_2")
