@@ -9,6 +9,7 @@ import clodius.tiles.bigwig as hgbw
 from clodius.utils import TILE_OPTIONS_CHAR
 import pybigtools
 import slugid
+from hashlib import md5
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -260,8 +261,10 @@ def get_bigbed_tile(
         {
             "chrOffset": chrOffsets[interval[0]],
             "importance": random.random(),
-            "uid": slugid.nice(),
+            "uid": md5("".join(map(str, interval)).encode('utf8')).hexdigest(),
             "fields": interval,
+            'xStart': chrOffsets[interval[0]] + interval[1],
+            'xEnd': chrOffsets[interval[0]] + interval[2],
         }
         for interval in chosen_intervals
     ]

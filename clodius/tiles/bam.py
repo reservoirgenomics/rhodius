@@ -192,7 +192,7 @@ def variants_list(ref, seq):
         ref_pos += 1
 
         if seq[i] != ref[i]:
-            variants += [(seq_pos-1, ref_pos-1, seq[i])]
+            variants += [(seq_pos-1, ref_pos-1, seq[i], ref[i])]
 
     return variants
 
