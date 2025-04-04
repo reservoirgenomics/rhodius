@@ -1,6 +1,9 @@
 import numpy as np
+import h5py
 
-def tileset_info(f, bounds=None):
+def tileset_info(file, bounds=None):
+    f = h5py.File(file, "r")
+
     if 'min-pos' in f.attrs:
         min_pos = f.attrs['min-pos']
     else:
@@ -19,14 +22,14 @@ def tileset_info(f, bounds=None):
         'bins_per_dimension': 256,
     }
 
-def tiles(f, z,x,y):
+def tiles(file, z,x,y):
     '''
     Return tiles for the given region.
 
     Parameters:
     -----------
-    f: h5py.File
-        File pointer to the hdf5 file containing the matrices
+    file: str | filelike
+        Path or file-like object of the file to load
     z: int
         The zoom level
     x: int
@@ -34,8 +37,10 @@ def tiles(f, z,x,y):
     y: int
         The tile's y position
     '''
+    f = h5py.File(file, "r")
+
     resolutions = sorted(map(int, f['resolutions'].keys()))[::-1]
-    tsinfo = tileset_info(f)
+    tsinfo = tileset_info(file)
     n_bins = tsinfo['bins_per_dimension']
 
     if z >= len(resolutions):

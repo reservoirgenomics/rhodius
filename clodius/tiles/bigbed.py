@@ -331,10 +331,8 @@ def tiles(bbpath, tile_ids, chromsizes_map={}, chromsizes=None):
             min_elements = MIN_ELEMENTS
             max_elements = MAX_ELEMENTS
 
-        if chromsizes:
-            chromnames = [c[0] for c in chromsizes]
-            chromlengths = [int(c[1]) for c in chromsizes]
-            chromsizes_to_use = pd.Series(chromlengths, index=chromnames)
+        if chromsizes is not None:
+            chromsizes_to_use = chromsizes
         else:
             chromsizes_id = None
             if "cos" in tile_options:
