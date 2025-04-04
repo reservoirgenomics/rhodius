@@ -11,3 +11,4 @@ pybbi>=0.2.0
 Click>=7
 pydantic
 typing
+biopython
