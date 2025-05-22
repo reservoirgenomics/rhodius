@@ -133,7 +133,7 @@ def load_reads(
 
     MAX_SIZE = 4e6
     if total_size > MAX_SIZE:
-        return {"error": "Tile encompasses too much data: {total_size}"}
+        return {"error": f"Tile encompasses too much data: {total_size}"}
 
     for cid, start, end in abs2genomic(lengths, start_pos, end_pos):
         chr_offset = int(abs_chrom_offsets[cid])
