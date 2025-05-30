@@ -213,7 +213,7 @@ class TilesetInfo(BaseModel):
     max_width: int
     max_pos: List[int]
     min_pos: List[int]
-    chromizes: Optional[List]
+    chromizes: Optional[List] = None
 
     @validator("max_zoom")
     def max_zoom_zero_or_greater(cls, v):
