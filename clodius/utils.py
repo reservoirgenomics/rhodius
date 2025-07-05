@@ -63,7 +63,7 @@ FILETYPES = {
 def infer_filetype(filename):
     for filetype, meta in FILETYPES.items():
         for ext in meta["extensions"]:
-            if filename.endswith(ext):
+            if filename.endswith(ext.lower()):
                 return filetype
 
     return None
