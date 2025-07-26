@@ -1,5 +1,7 @@
 import numpy as np
 import h5py
+from clodius.tiles.utils import tiles_wrapper_2d
+from clodius.tiles.format import format_dense_tile
 
 def tileset_info(file, bounds=None):
     f = h5py.File(file, "r")
@@ -22,7 +24,7 @@ def tileset_info(file, bounds=None):
         'bins_per_dimension': 256,
     }
 
-def tiles(file, z,x,y):
+def single_tile(file, z,x,y):
     '''
     Return tiles for the given region.
 
@@ -68,3 +70,9 @@ def tiles(file, z,x,y):
             constant_values = (np.nan, np.nan))
 
     return data
+
+def tiles(filepath, tile_ids):
+    "Retrieve a set of tiles."
+    return tiles_wrapper_2d(
+            tile_ids, lambda z, x, y: format_dense_tile(single_tile(filepath, z, x, y))
+        )
