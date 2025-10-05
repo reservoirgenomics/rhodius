@@ -57,6 +57,7 @@ def tileset_info(array, bounds=None, bins_per_dimension=1024):
         "max_zoom": max_zoom,
         "bins_per_dimension": bins_per_dimension,
         "tile_size": bins_per_dimension,
+        "shape": array.shape,
     }
 
 
@@ -124,9 +125,9 @@ def tiles(array, z, x, not_nan_array=None, bin_size=1024):
         pad_width = ((0, divisible_x_pad),)
     else:
         pad_width = ((0, divisible_x_pad),) + ((0, 0),) * (len(data.shape) - 1)
-    
+
     a = np.pad(data, pad_width, "constant", constant_values=(np.nan,))
-    
+
     # Reshape and sum along first axis, preserving other dimensions
     if len(a.shape) == 1:
         ret_array = np.nansum(a.reshape((-1, num_to_sum)), axis=1)
@@ -143,21 +144,23 @@ def tiles(array, z, x, not_nan_array=None, bin_size=1024):
     if len(not_nan_data.shape) == 1:
         na_pad_width = ((0, divisible_x_pad),)
     else:
-        na_pad_width = ((0, divisible_x_pad),) + ((0, 0),) * (len(not_nan_data.shape) - 1)
-    
+        na_pad_width = ((0, divisible_x_pad),) + ((0, 0),) * (
+            len(not_nan_data.shape) - 1
+        )
+
     na = np.pad(not_nan_data, na_pad_width, "constant", constant_values=(np.nan,))
-    
+
     if len(na.shape) == 1:
         norm_array = np.nansum(na.reshape((-1, num_to_sum)), axis=1)
     else:
         na_new_shape = (-1, num_to_sum) + na.shape[1:]
         norm_array = np.nansum(na.reshape(na_new_shape), axis=1)
-    
+
     ret_array = ret_array / (norm_array + 1)
 
     # determine how much to pad the array
     x_pad = bin_size - ret_array.shape[0]
-    
+
     if len(ret_array.shape) == 1:
         final_pad_width = ((0, x_pad),)
     else:
