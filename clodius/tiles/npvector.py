@@ -32,7 +32,6 @@ def tileset_info(array, bounds=None, bins_per_dimension=1024):
     max_zoom = 0 if max_zoom < 0 else max_zoom
 
     max_width = 2**max_zoom * bins_per_dimension
-    # print('max_zoom:', max_zoom)
 
     scale_up = max_width / max_dim
 
