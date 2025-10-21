@@ -88,7 +88,7 @@ def run_clustal_omega(sequences, seq_ids=None, seqtype="dna"):
 
 
 def make_pwm_from_alignment(
-    alignment, pseudocount=1, seqtype: Literal["dna", "protein"] = "dna"
+    alignment, pseudocount=0, seqtype: Literal["dna", "protein"] = "dna"
 ):
     """
     Build a PWM from an aligned set of sequences.
@@ -102,8 +102,6 @@ def make_pwm_from_alignment(
     """
     if seqtype is None:
         seqtype = "dna" if len(alignment[0]) == 4 else "protein"
-
-    print("seqtype", seqtype)
 
     alphabet = DNA_ALPHABET if seqtype == "dna" else PROTEIN_ALPHABET
 
@@ -130,7 +128,7 @@ def make_pwm_from_alignment(
 def generate_pwm_from_sequences(
     sequences,
     seq_ids=None,
-    pseudocount=1,
+    pseudocount=0,
     seqtype: Optional[Literal["dna", "protein"]] = None,
 ):
     """

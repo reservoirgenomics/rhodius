@@ -45,7 +45,6 @@ def tile_functions(sequences, seqtype: Optional[Literal["dna", "protein"]] = Non
         to_ret = []
 
         for tile_id in tile_ids:
-            print("tile_id", tile_id)
             parts = tile_id.split(".")
             z = int(parts[1])
             x = int(parts[2])
@@ -109,6 +108,9 @@ def csv_tileset_functions(filename, colname=None, colnum=None, header=True, sep=
         header = None
     else:
         header = 0
+
+    if not colname and not colnum:
+        raise ValueError("No colname or colnum specified")
 
     df = pd.read_csv(filename, header=header, sep=sep)
 
