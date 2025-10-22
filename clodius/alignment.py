@@ -7,8 +7,9 @@ from typing import Literal, Optional
 import tempfile
 import os
 
-DNA_ALPHABET = ["A", "C", "G", "T"]
+DNA_ALPHABET = ["-", "A", "C", "G", "T"]
 PROTEIN_ALPHABET = [
+    "-",
     "A",
     "C",
     "D",
