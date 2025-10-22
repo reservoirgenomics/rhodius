@@ -11,8 +11,10 @@ from functools import lru_cache
 from typing import Optional
 
 
-def tile_functions(sequences, seqtype: Optional[Literal["dna", "protein"]] = None):
-    pwm = generate_pwm_from_sequences(sequences, seqtype=seqtype)
+def tile_functions(
+    sequences, seqtype: Optional[Literal["dna", "protein"]] = None, refseq=None
+):
+    pwm, seqs = generate_pwm_from_sequences(sequences, seqtype=seqtype, refseq=refseq)
 
     if seqtype is None:
         seqtype = "dna" if len(pwm) == 4 else "protein"
@@ -33,6 +35,7 @@ def tile_functions(sequences, seqtype: Optional[Literal["dna", "protein"]] = Non
     tsinfo["resolutions"] = sorted(
         [2**i for i in range(tsinfo["max_zoom"] + 1)], key=lambda x: -x
     )
+    tsinfo["aligned_seqs"] = seqs
     # tsinfo["max_pos"] = len(vector[0])
 
     del tsinfo["max_zoom"]
@@ -87,7 +90,9 @@ def get_local_tiles(filename, colname=None, colnum=None, sep=","):
 
 
 # @lru_cache
-def csv_tileset_functions(filename, colname=None, colnum=None, header=True, sep=","):
+def csv_tileset_functions(
+    filename, colname=None, colnum=None, header=True, sep=",", refrow=None
+):
     """Read a csv file and return a list of sequences.
 
     Parameters
@@ -101,6 +106,8 @@ def csv_tileset_functions(filename, colname=None, colnum=None, header=True, sep=
         Only used if colname is not provided.
     sep: string
         The separator used in the csv file
+    refrow: A row to use as a reference sequence when calculating
+        alignments. Should be 1-based
     """
     import pandas as pd
 
@@ -119,7 +126,12 @@ def csv_tileset_functions(filename, colname=None, colnum=None, header=True, sep=
 
     sequences = df[colname].values
 
-    return tile_functions(sequences)
+    if refrow:
+        refseq = sequences[refrow - 1]
+    else:
+        refseq = None
+
+    return tile_functions(sequences, refseq=refseq)
 
 
 def csv_tileset_info(
@@ -128,6 +140,7 @@ def csv_tileset_info(
     colnum: Optional[int] = None,
     header=True,
     sep=",",
+    refrow=None,
 ):
     """Get tileset info for a sequence logo file file from
     a csv file.
@@ -143,12 +156,13 @@ def csv_tileset_info(
         Only used if colname is not provided.
     header: bool
         Whether to assume that a header is present in the csv file
-
     sep: string
         The separator used in the csv file
+    refrow: A row to use as a reference sequence when calculating
+        alignments. Should be 1-based
     """
     tf = csv_tileset_functions(
-        filename, colname=colname, colnum=colnum, header=header, sep=sep
+        filename, colname=colname, colnum=colnum, header=header, sep=sep, refrow=refrow
     )
     return tf["tileset_info"]()
 
