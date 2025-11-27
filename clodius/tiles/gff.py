@@ -5,6 +5,7 @@ import clodius.tiles.bedfile as ctb
 import pandas as pd
 
 from clodius.utils import get_file_compression
+from clodius.models.gff_models import *
 
 
 def gff_chromsizes(filename):
@@ -133,6 +134,134 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
         ft.partial(row_to_bedlike, css=css, orig_columns=orig_columns), axis=1
     )
     return list(ret.values)
+
+
+def parse_gff_to_models(filtered_df):
+    """Parse filtered GFF dataframe into gene and transcript models."""
+    def parse_attributes(attr_str):
+        if pd.isna(attr_str):
+            return {}
+        attrs = {}
+        for item in attr_str.split(';'):
+            if '=' in item:
+                key, value = item.split('=', 1)
+                attrs[key] = value
+        return attrs
+    
+    genes = {}
+    transcripts = {}
+    pseudogenes = {}
+    
+    for _, row in filtered_df.iterrows():
+        attrs = parse_attributes(row['attributes'])
+        
+        entity_data = {
+            'id': attrs.get('ID', f"{row['type']}_{row['start']}_{row['end']}"),
+            'start': row['start'],
+            'end': row['end'],
+            'strand': row['strand'] if row['strand'] in ['+', '-', '.'] else None,
+            'score': float(row['score']) if pd.notna(row['score']) and row['score'] != '.' else None,
+            'phase': int(row['phase']) if pd.notna(row['phase']) and row['phase'] != '.' else None,
+            'attributes': attrs
+        }
+        
+        if row['type'] == 'gene':
+            gene = Gene(
+                **entity_data,
+                gene_biotype=attrs.get('gene_biotype'),
+                pseudo=attrs.get('pseudo') == 'true'
+            )
+            genes[entity_data['id']] = GeneModel(gene=gene)
+            
+        elif row['type'] == 'pseudogene':
+            pseudogene = Pseudogene(**entity_data)
+            pseudogenes[entity_data['id']] = PseudogeneModel(pseudogene=pseudogene)
+            
+        elif row['type'] == 'mRNA':
+            transcript = mRNA(
+                **entity_data,
+                parent_gene_id=attrs.get('Parent', '')
+            )
+            transcripts[entity_data['id']] = transcript
+            
+        elif row['type'] == 'lnc_RNA':
+            transcript = lnc_RNA(
+                **entity_data,
+                parent_gene_id=attrs.get('Parent', '')
+            )
+            transcripts[entity_data['id']] = transcript
+            
+        elif row['type'] == 'primary_transcript':
+            transcript = primary_transcript(
+                **entity_data,
+                parent_gene_id=attrs.get('Parent', '')
+            )
+            transcripts[entity_data['id']] = transcript
+            
+        elif row['type'] == 'antisense_RNA':
+            transcript = antisense_RNA(
+                **entity_data,
+                parent_gene_id=attrs.get('Parent', '')
+            )
+            transcripts[entity_data['id']] = transcript
+            
+        elif row['type'] == 'snoRNA':
+            transcript = snoRNA(
+                **entity_data,
+                parent_gene_id=attrs.get('Parent', '')
+            )
+            transcripts[entity_data['id']] = transcript
+            
+        elif row['type'] in ['tRNA', 'rRNA', 'snRNA', 'SRP_RNA', 'RNase_P_RNA', 'RNase_MRP_RNA']:
+            transcript_class = globals().get(row['type'], tRNA)
+            transcript = transcript_class(
+                **entity_data,
+                parent_gene_id=attrs.get('Parent', '')
+            )
+            transcripts[entity_data['id']] = transcript
+            
+        elif row['type'] == 'ncRNA':
+            # Generic ncRNA - use lnc_RNA as fallback
+            transcript = lnc_RNA(
+                **entity_data,
+                parent_gene_id=attrs.get('Parent', '')
+            )
+            transcripts[entity_data['id']] = transcript
+            
+        elif row['type'] == 'miRNA':
+            mirna = miRNA(
+                **entity_data,
+                parent_transcript_id=attrs.get('Parent', '')
+            )
+            parent_id = attrs.get('Parent', '')
+            if parent_id in transcripts and hasattr(transcripts[parent_id], 'mirnas'):
+                transcripts[parent_id].mirnas.append(mirna)
+            
+        elif row['type'] == 'exon':
+            exon = Exon(**entity_data)
+            parent_id = attrs.get('Parent', '')
+            if parent_id in transcripts:
+                transcripts[parent_id].exons.append(exon)
+            elif parent_id in pseudogenes:
+                pseudogenes[parent_id].pseudogene.exons.append(exon)
+                
+        elif row['type'] == 'CDS':
+            cds = CDS(**entity_data)
+            parent_id = attrs.get('Parent', '')
+            if parent_id in transcripts and isinstance(transcripts[parent_id], mRNA):
+                transcripts[parent_id].cds.append(cds)
+        
+        # Skip unmodeled features: mobile_genetic_element, region, sequence_feature
+    
+    # Associate transcripts with genes
+    for transcript in transcripts.values():
+        if hasattr(transcript, 'parent_gene_id') and transcript.parent_gene_id in genes:
+            genes[transcript.parent_gene_id].transcripts.append(transcript)
+    
+    # Combine genes and pseudogenes
+    all_genes = {**genes, **pseudogenes}
+    
+    return all_genes, transcripts
 
 
 def tiles(filename, tile_ids, chromsizes=None, index_filename=None, settings=None):
