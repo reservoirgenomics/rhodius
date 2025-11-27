@@ -1,4 +1,6 @@
+notebooks/*.ipynb
 notebooks/Scratch.ipynb
+.vscode
 
 notebooks/VCF.ipynb
 
