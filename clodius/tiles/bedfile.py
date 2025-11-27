@@ -145,7 +145,8 @@ def single_indexed_tile(
 
         df = pl.read_ipc(arrow_ipc)
 
-        return [x.split("\t") for x in df["raw"]]
+        ret = [x.split("\t") for x in df["raw"]]
+        return ret
 
     try:
         res = ctt.single_indexed_tile(

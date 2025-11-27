@@ -1,5 +1,7 @@
 from Bio import Align
-from Bio.Seq import Seq
+from clodius.alignment import align_sequences, alignment_to_subs, order_by_clustering
+from clodius.tiles.csv import csv_sequence_tileset_functions
+
 
 def align_sequences(seq1, seq2):
     """Align two sequences to each other and return an alignment object."""
@@ -15,86 +17,110 @@ def align_sequences(seq1, seq2):
     best_alignment = alignments[0]
 
     return best_alignment
-    
-def get_subs(a):
-    """Convert a BioPython alignment object into the pileup "subs" format.
-    
-    This format lists the modifications to the target sequence that turn it into
-    the query.
+
+
+def tile_functions(seqs, refseq, cluster=None, values=None):
+    """Return a dictionary of tile functions for the pileup track."""
+
+    longest_seq = max([len(s) for s in seqs])
+
+    def tileset_info():
+        return {
+            "tile_size": longest_seq,
+            "resolutions": [1],
+            "max_tile_width": longest_seq,
+            "format": "subs",
+            "min_pos": [0],
+            "max_pos": [longest_seq],
+            "chromsizes": [[None, longest_seq]],
+        }
+
+    if cluster == "linkage":
+        seqs = order_by_clustering(seqs)
+
+    tile = []
+    for i, seq in enumerate(seqs):
+        a = align_sequences(refseq, seq)
+        start, end, subs = alignment_to_subs(a)
+
+        tv = {
+            "id": f"r{i}",
+            "from": start,
+            "to": end,
+            "substitutions": subs,
+            "color": 0,
+        }
+
+        if values:
+            tv["extra"] = values[i]
+
+        tile.append(tv)
+
+    def tiles(tile_ids):
+        tiles = []
+
+        for tile_id in tile_ids:
+            parts = tile_id.split(".")
+            z = int(parts[1])
+            x = int(parts[2])
+
+            if z != 0 and x != 0:
+                # return an empty tile
+                tiles += [(tile_id, [])]
+            else:
+                # return the entire tile
+                tiles += [(tile_id, tile)]
+
+        return tiles
+
+    return {"tileset_info": tileset_info, "tiles": tiles}
+
+
+def csv_tileset_info(filename, *csv_args, **csv_kwargs):
+    """Get tileset info for a sequence logo file file from
+    a csv file.
+
+    Parameters
+    ----------
+    filename: string
+        The name of the csv file
+    colname: Optional[str]
+        The name of the column containing the sequences.
+    colnum: Optional[int]
+        The column number of the sequence logo file. 0-based.
+        Only used if colname is not provided.
+    header: bool
+        Whether to assume that a header is present in the csv file
+    sep: string
+        The separator used in the csv file
+    refrow: A row to use as a reference sequence when calculating
+        alignments. Should be 1-based
     """
-    parts = []
-    ttrue = 0
-    tpos = 0
-    qpos = 0
+    tf = csv_sequence_tileset_functions(
+        filename, tile_functions=tile_functions, *csv_args, **csv_kwargs
+    )
+    return tf["tileset_info"]()
 
-    start = 0
-    end = 0
 
-    aligneds = list(zip(a.aligned[0], a.aligned[1]))
+def csv_tiles(filename, tile_ids, *csv_args, **csv_kwargs):
+    tf = csv_sequence_tileset_functions(
+        filename, tile_functions=tile_functions, *csv_args, **csv_kwargs
+    )
 
-    for i, ((ts, te), (qs, qe)) in enumerate(aligneds):
-        ts,te,qs,qe = int(ts), int(te), int(qs), int(qe)
-        
-        if i == 0:
-            # start position
-            start = ts
-            tpos = ts
-            ttrue = 0
-        if i == len(aligneds) - 1:
-            # end position
-            end = te
-            
-        if ts > tpos:
-            parts += [{'pos': ttrue, 'type': 'D', 'length': ts - tpos}]
-            ttrue += ts - tpos
-        if qs > qpos:
-            parts += [{'pos': ttrue, 'type': 'I', 'length': qs - qpos}]
-        for i in range(te - ts):
-            if a.target[ts + i] != a.query[qs + i]:
-                parts += [{'pos': ttrue + i, 'type': 'X', 'length': 1, 'base': a.target[ts + i], 'variant': a.query[qs + i]}]
+    return tf["tiles"](tile_ids)
 
-        ttrue += (te - ts)
-        tpos = te
-        qpos = qe
 
-    if qpos < len(a.query):
-        parts += [{'pos': ttrue, 'type': 'I', 'length': len(a.query) - qpos}]
-    
-    return start+1, end+1, parts
+def get_local_tiles(filename, *csv_args, **csv_kwargs):
+    """Get local higlass tiles for the provided file."""
+    tsinfo = csv_tileset_info(filename, *csv_args, **csv_kwargs)
+    max_resolution = max(tsinfo["resolutions"])
 
-def get_pileup_alignment_data(ref: str, seqs: list[str]) -> dict:
-    """Get a local tile for use in a higlass-pileup plot.
+    tile_ids = []
 
-    :param ref: The reference to align to
-    :param seqs: The sequences to align to the reference
-    """
-    local_data = {
-      "type": 'local-tiles',
-      "tilesetInfo": {
-        'min_pos': [0],
-        'max_pos': [len(ref)],
-        'max_width': len(ref),
-        'tile_size': len(ref),
-        'chromsizes': [['a', len(ref)]],
-        'max_zoom': 0,
-        'max_tile_width': 100000,
-        'format': 'subs'
-      },
-      "tiles": {
-        '0.0': [],
-      }
-    }
-    
-    for i,seq in enumerate(seqs):
-        a = align_sequences(ref, seq)
-        start, end, subs = get_subs(a)
+    for i, res in enumerate(sorted(tsinfo["resolutions"], key=lambda x: -x)):
+        for j in range(0, max_resolution // res):
+            tile_ids += [f"x.{i}.{j}"]
 
-        local_data['tiles']['0.0'].append({
-          "id": f"r{i}",
-          "from": start,
-          "to": end,
-          "substitutions": subs,
-          "color": 0
-        })
+    tiles = dict(csv_tiles(filename, tile_ids, *csv_args, **csv_kwargs))
 
-    return local_data
+    return {"tilesetInfo": tsinfo, "tiles": tiles}
