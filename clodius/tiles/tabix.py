@@ -168,13 +168,17 @@ def dataframe_tabix_fetcher(file, index, ref, start, end):
     import oxbow as ox
 
     if isinstance(index, str):
-        index = open(index, "rb")
+        index = open(index, "rb", compression="disable")
 
     if start == 0:
         start = 1
     pos = f"{ref}:{start}-{end}"
     file.seek(0)
     index.seek(0)
+
+    print("file", file)
+    print("index", index)
+
     try:
         arrow_ipc = ox.read_tabix(file, pos, index)
     except ValueError as ex:
@@ -256,10 +260,24 @@ def df_single_tile(filename, chromsizes, tsinfo, z, x, mode: Literal["gff", "bed
 
     cids_starts_ends = list(abs2genomic(chromsizes, start_pos, end_pos))
 
+    # Reset file position to beginning if it's a file object
+    if hasattr(filename, "seek"):
+        filename.seek(0)
+
     df = pl.read_csv(filename, separator="\t", has_header=False, comment_char="#")
-    
+
     if mode == "gff":
-        df.columns = ['seqid', 'source', 'type', 'start', 'end', 'score', 'strand', 'phase', 'attributes']
+        df.columns = [
+            "seqid",
+            "source",
+            "type",
+            "start",
+            "end",
+            "score",
+            "strand",
+            "phase",
+            "attributes",
+        ]
 
     filtered_rows = []
 

@@ -11,6 +11,7 @@ import json
 
 import clodius.tiles.tabix as ctt
 import logging
+
 from smart_open import open
 
 # import pysam
@@ -175,7 +176,7 @@ def get_bedfile_values(filename, chromsizes, settings):
         # we already have a file pointer
         filename = filename
     else:
-        filename = open(filename, "rb")
+        filename = open(filename, "rb", compression="disable")
 
     f = filename
 
@@ -280,7 +281,14 @@ def tiles(
     tile_values = []
 
     if isinstance(filename, str):
-        file = open(filename, "rb")
+        if index_filename:
+            # If the file is indexed we need to disable compression so that
+            # tabix indexing can retrieve the correct positions
+            file = open(filename, "rb", compression="disable")
+        else:
+            # If the file isn't indexed, we're going to use a polars dataframe
+            # to load it and that requires the compression to be resolved
+            file = open(filename, "rb")
     else:
         file = filename
 
