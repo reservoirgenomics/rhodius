@@ -62,3 +62,17 @@ def test_no_item_rgb():
     filename = op.join("data", "no_item_rgb.bed")
 
     tiles = ctb.tiles(filename, ["x.0.0"], chromsizes, index_filename=None)
+
+
+def test_indexed_bedfile_tiles():
+    valid_filename = op.join("data", "regions.valid.bed.gz")
+    index_filename = op.join("data", "regions.valid.bed.gz.tbi")
+    chromsizes_fn = op.join("data", "chm13v1.chrom.sizes")
+
+    chromsizes = cc.chromsizes_as_series(chromsizes_fn)
+    tiles = ctb.tiles(
+        valid_filename, ["x.0.0"], chromsizes, index_filename=index_filename
+    )
+
+    assert len(tiles) > 0
+    assert "error" not in tiles[0][1]

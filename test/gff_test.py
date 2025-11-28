@@ -22,4 +22,5 @@ def test_tiles():
 
     assert len(tiles) == 1
     assert tiles[0][0] == "x.0.0"
-    assert len(tiles[0][1]) > 20
+
+    assert len(tiles[0][1][0].keys()) > 20

@@ -11,6 +11,7 @@ import json
 
 import clodius.tiles.tabix as ctt
 import logging
+from smart_open import open
 
 # import pysam
 from clodius.tiles.vcf import generic_regions
@@ -113,56 +114,28 @@ def ts_hash(filename, chromsizes):
     return f"{filename}.{cs_hash}"
 
 
-def single_indexed_tile(
-    filename, index_filename, chromsizes, tsinfo, z, x, tbx_index, settings
-):
+def single_indexed_tile(file, index, chromsizes, tsinfo, z, x, tbx_index, settings):
     """Retrieve a single tile from an indexed bedfile."""
+    from clodius.tiles.tabix import dataframe_tabix_fetcher
+
     css = chromsizes.cumsum().shift().fillna(0).to_dict()
 
-    # import pysam
+    # try:
+    df = ctt.single_indexed_tile(
+        file,
+        index,
+        chromsizes,
+        tsinfo,
+        z,
+        x,
+        tbx_index=tbx_index,
+        fetcher=dataframe_tabix_fetcher,
+        max_results=settings.get("MAX_BEDFILE_ENTRIES"),
+    )
 
-    # tb = pysam.TabixFile(filename, index=index_filename, encoding="utf8")
-
-    # def fetcher(ref, start, end):
-    #     return tb.fetch(ref, start, end)
-
-    import oxbow as ox
-    import polars as pl
-
-    def fetcher(ref, start, end):
-        if start == 0:
-            start = 1
-        pos = f"{ref}:{start}-{end}"
-        filename.seek(0)
-        index_filename.seek(0)
-        try:
-            arrow_ipc = ox.read_tabix(filename, pos, index_filename)
-        except ValueError as ex:
-            # print("str(ex)", str(ex))
-            if "missing reference sequence" in str(ex):
-                return []
-            raise
-
-        df = pl.read_ipc(arrow_ipc)
-
-        ret = [x.split("\t") for x in df["raw"]]
-        return ret
-
-    try:
-        res = ctt.single_indexed_tile(
-            filename,
-            index_filename,
-            chromsizes,
-            tsinfo,
-            z,
-            x,
-            None,
-            tbx_index,
-            fetcher,
-            max_results=settings.get("MAX_BEDFILE_ENTRIES"),
-        )
-    except ValueError as err:
-        return {"error": str(err)}
+    res = [x.split("\t") for x in df["raw"]]
+    # except ValueError as err:
+    #     return {"error": str(err)}
 
     formatted = []
 
@@ -306,9 +279,13 @@ def tiles(
 
     tile_values = []
 
-    index = None
+    if isinstance(filename, str):
+        file = open(filename, "rb")
+    else:
+        file = filename
+
     if index_filename:
-        index = ctt.load_tbi_idx(index_filename)
+        tbx_index = ctt.load_tbi_idx(index_filename)
 
     for tile_id in tile_ids:
         tile_option_parts = tile_id.split(TILE_OPTIONS_CHAR)[1:]
@@ -325,19 +302,17 @@ def tiles(
 
         if index_filename:
             values = single_indexed_tile(
-                filename,
+                file,
                 index_filename,
                 chromsizes,
                 tsinfo,
                 z,
                 x,
-                tbx_index=index,
+                tbx_index=tbx_index,
                 settings=settings,
             )
         else:
-            values = single_tile_func(
-                filename, chromsizes, tsinfo, z, x, settings=settings
-            )
+            values = single_tile_func(file, chromsizes, tsinfo, z, x, settings=settings)
 
         tile_values += [(tile_id, values)]
 
