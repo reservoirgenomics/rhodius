@@ -8,6 +8,9 @@ import polars as pl
 from clodius.utils import get_file_compression
 from clodius.models.gff_models import *
 from clodius.tiles.tabix import df_single_tile
+from clodius.utils import TILE_OPTIONS_CHAR
+from clodius.tiles.tabix import load_tbi_idx, single_indexed_tile
+from smart_open import open
 
 
 def gff_chromsizes(filename):
@@ -136,6 +139,29 @@ def single_tile(filename, chromsizes, tsinfo, z, x, settings=None):
         ft.partial(row_to_bedlike, css=css, orig_columns=orig_columns), axis=1
     )
     return list(ret.values)
+
+
+def convert_raw_to_gff_df(raw_data):
+    """Convert table with 'raw' column containing GFF rows to dataframe format."""
+    rows = []
+    for item in raw_data.iter_rows(named=True):
+        raw_line = item["raw"]
+        parts = raw_line.split("\t")
+        if len(parts) >= 9:
+            rows.append(
+                {
+                    "seqname": parts[0],
+                    "source": parts[1],
+                    "type": parts[2],
+                    "start": int(parts[3]),
+                    "end": int(parts[4]),
+                    "score": parts[5],
+                    "strand": parts[6],
+                    "phase": parts[7],
+                    "attributes": parts[8],
+                }
+            )
+    return pl.DataFrame(rows)
 
 
 def parse_gff_to_models(filtered_df, settings=None):
@@ -268,7 +294,6 @@ def parse_gff_to_models(filtered_df, settings=None):
 
     # Combine genes and pseudogenes
     all_genes = {**genes, **pseudogenes}
-
     return all_genes, transcripts
 
 
@@ -288,13 +313,54 @@ def tiles(filename, tile_ids, chromsizes=None, index_filename=None, settings=Non
 
         return parse_gff_to_models(df)
 
-    return ctb.tiles(
-        filename,
-        tile_ids,
-        chromsizes,
-        index_filename,
-        settings,
-        # single_tile_func should get a list of rows
-        # and return a list of entries
-        single_tile_func=gff_single_tile_func,
-    )
+    if isinstance(filename, str):
+        file = open(filename, "rb", compression="disable")
+    else:
+        file = filename
+
+    if isinstance(index_filename, str):
+        index = open(index_filename, "rb", compression="disable")
+    else:
+        index = index_filename
+
+    tile_values = []
+    tsinfo = tileset_info(filename, chromsizes, index_filename)
+
+    if index_filename:
+        tbx_index = load_tbi_idx(index_filename)
+
+    for tile_id in tile_ids:
+        tile_option_parts = tile_id.split(TILE_OPTIONS_CHAR)[1:]
+        tile_no_options = tile_id.split(TILE_OPTIONS_CHAR)[0]
+        tile_id_parts = tile_no_options.split(".")
+        tile_position = list(map(int, tile_id_parts[1:3]))
+        tile_options = dict([o.split(":") for o in tile_option_parts])
+
+        if len(tile_position) < 2:
+            raise IndexError("Not enough tile info present")
+
+        z, x = tile_position
+
+        if index_filename:
+            try:
+                raw_data = single_indexed_tile(
+                    file=file,
+                    index=index,
+                    chromsizes=chromsizes,
+                    tsinfo=tsinfo,
+                    z=z,
+                    x=x,
+                    tbx_index=tbx_index,
+                )
+                converted_df = convert_raw_to_gff_df(raw_data)
+                values = parse_gff_to_models(converted_df)
+            except ValueError as ve:
+                values = {"error": str(ve)}
+        else:
+            values = gff_single_tile_func(
+                file, chromsizes, tsinfo, z, x, settings=settings
+            )
+
+        tile_values += [(tile_id, values)]
+
+    return tile_values

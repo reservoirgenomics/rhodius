@@ -1,16 +1,15 @@
 import collections as col
 import gzip
-import math
-import random
 import struct
-import zlib
 import polars as pl
+import pandas as pd
 from typing import Literal
 
 import numpy as np
 from smart_open import open
 
 from clodius.tiles.bigwig import abs2genomic
+from clodius.utils import get_file_compression
 
 
 def load_bai_index(index_file):
@@ -176,9 +175,6 @@ def dataframe_tabix_fetcher(file, index, ref, start, end):
     file.seek(0)
     index.seek(0)
 
-    print("file", file)
-    print("index", index)
-
     try:
         arrow_ipc = ox.read_tabix(file, pos, index)
     except ValueError as ex:
@@ -198,18 +194,14 @@ def single_indexed_tile(
     z,
     x,
     tbx_index,
-    fetcher,
+    fetcher=dataframe_tabix_fetcher,
     max_tile_width=None,
     max_results=None,
 ):
-
-    if max_results is None:
-        max_results = 2048
-
     tile_width = tsinfo["max_width"] / 2**z
 
     if max_tile_width and tile_width > max_tile_width:
-        return {"error": "Tile too wide"}
+        raise ValueError(f"Tile too wide {tile_width}. Max width: {max_tile_width}.")
 
     query_size = 0
 
@@ -231,7 +223,7 @@ def single_indexed_tile(
     MAX_QUERY_SIZE = 1000000
 
     if query_size > MAX_QUERY_SIZE:
-        return {"error": f"Tile too large {query_size}"}
+        raise ValueError(f"Tile too large {query_size}")
 
     for cid, start, end in cids_starts_ends:
         if cid >= len(chromsizes):
@@ -239,15 +231,14 @@ def single_indexed_tile(
 
         chrom = chromsizes.index[cid]
         df = fetcher(file, index, str(chrom), int(start), int(end))
-
         if df is not None:
             if ret_vals is None:
                 ret_vals = df
             else:
                 ret_vals = pl.concat([ret_vals, df])
 
-    if len(ret_vals) > max_results:
-        return {"error": f"Too many values in tile {len(ret_vals)}"}
+    if max_results and len(ret_vals) > max_results:
+        raise ValueError(f"Too many values in tile {len(ret_vals)}")
 
     return ret_vals
 
@@ -264,7 +255,15 @@ def df_single_tile(filename, chromsizes, tsinfo, z, x, mode: Literal["gff", "bed
     if hasattr(filename, "seek"):
         filename.seek(0)
 
-    df = pl.read_csv(filename, separator="\t", has_header=False, comment_char="#")
+    df = pl.from_pandas(
+        pd.read_csv(
+            filename,
+            delimiter="\t",
+            header=None,
+            comment="#",
+            compression=get_file_compression(filename),
+        )
+    )
 
     if mode == "gff":
         df.columns = [
