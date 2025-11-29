@@ -1,4 +1,4 @@
-import pandas as pd
+import polars as pl
 import pytest
 from clodius.models.gff_models import *
 from clodius.tiles.gff import parse_gff_to_models
@@ -10,20 +10,20 @@ def test_load_and_parse_gff_positions():
     gff_file = "data/genomic.10k.gff"
     
     # Read GFF file, filtering for the specified contig and position range
-    df = pd.read_csv(
+    df = pl.read_csv(
         gff_file,
-        sep='\t',
-        comment='#',
-        header=None,
-        names=['seqid', 'source', 'type', 'start', 'end', 'score', 'strand', 'phase', 'attributes']
+        separator='\t',
+        comment_char='#',
+        has_header=False,
+        new_columns=['seqid', 'source', 'type', 'start', 'end', 'score', 'strand', 'phase', 'attributes']
     )
     
     # Filter for NC_004354.4 contig and position range 1002988-1053215
-    filtered_df = df[
-        (df['seqid'] == 'NC_004354.4') & 
-        (df['start'] >= 1002988) & 
-        (df['end'] <= 1053215)
-    ]
+    filtered_df = df.filter(
+        (pl.col('seqid') == 'NC_004354.4') & 
+        (pl.col('start') >= 1002988) & 
+        (pl.col('end') <= 1053215)
+    )
     
     assert len(filtered_df) > 0, "No entries found in the specified range"
     
