@@ -172,6 +172,7 @@ def dataframe_tabix_fetcher(file, index, ref, start, end):
     if start == 0:
         start = 1
     pos = f"{ref}:{start}-{end}"
+
     file.seek(0)
     index.seek(0)
 

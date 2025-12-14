@@ -190,6 +190,7 @@ def parse_gff_to_models(filtered_df, settings=None):
                 "ID",
                 f"{row.get('type')}_{row.get('start')}_{row.get('end')}",
             ),
+            "chrom": row.get("seqname"),
             "start": row.get("start"),
             "end": row.get("end"),
             "strand": (
@@ -274,6 +275,7 @@ def parse_gff_to_models(filtered_df, settings=None):
         elif feature_type == "exon":
             exon = Exon(**entity_data)
             parent_id = attrs.get("Parent", "")
+            print("parent_id", parent_id)
             if parent_id in transcripts:
                 transcripts[parent_id].exons.append(exon)
             elif parent_id in pseudogenes:
@@ -294,7 +296,13 @@ def parse_gff_to_models(filtered_df, settings=None):
 
     # Combine genes and pseudogenes
     all_genes = {**genes, **pseudogenes}
-    return all_genes, transcripts
+
+    for key in all_genes:
+        all_genes[key] = all_genes[key].model_dump()
+    for key in transcripts:
+        transcripts[key] = transcripts[key].model_dump()
+
+    return {"genes": all_genes, "transcripts": transcripts}
 
 
 def tiles(filename, tile_ids, chromsizes=None, index_filename=None, settings=None):
@@ -352,6 +360,8 @@ def tiles(filename, tile_ids, chromsizes=None, index_filename=None, settings=Non
                     x=x,
                     tbx_index=tbx_index,
                 )
+                # for row in raw_data.iter_rows(named=True):
+                #     print(row)
                 converted_df = convert_raw_to_gff_df(raw_data)
                 values = parse_gff_to_models(converted_df)
             except ValueError as ve:
