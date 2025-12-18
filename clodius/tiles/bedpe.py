@@ -91,7 +91,9 @@ def tileset_info(filename, chromsizes=None):
         has_header = False
 
     if chromsizes is None:
-        return {"error": "No chromsizes found. Make sure the assembly: tag is set"}
+        return {
+            "error": "No chromsizes found. Make sure the project has a chromsizes file or the assembly: tag is set"
+        }
 
     for chrom, size in chromsizes.items():
         chromsizes_list += [[chrom, int(size)]]
