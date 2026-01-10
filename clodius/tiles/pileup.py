@@ -3,6 +3,14 @@ from clodius.alignment import align_sequences, alignment_to_subs, order_by_clust
 from clodius.tiles.csv import csv_sequence_tileset_functions
 
 
+def calc_chr_offset(chromsizes, chrom_id):
+    sum = 0
+    for chrom in chromsizes:
+        if chrom[0] == chrom_id:
+            return sum
+        sum += chrom[1]
+
+
 def align_sequences(seq1, seq2):
     """Align two sequences to each other and return an alignment object."""
     aligner = Align.PairwiseAligner()
@@ -19,10 +27,9 @@ def align_sequences(seq1, seq2):
     return best_alignment
 
 
-def tile_functions(seqs, refseq, cluster=None, values=None):
+def tile_functions(seqs, refseqs, cluster=None, values=None, chromsizes=None):
     """Return a dictionary of tile functions for the pileup track."""
-
-    longest_seq = max([len(s) for s in seqs])
+    longest_seq = sum([c[1] for c in chromsizes])
 
     def tileset_info():
         return {
@@ -32,7 +39,7 @@ def tile_functions(seqs, refseq, cluster=None, values=None):
             "format": "subs",
             "min_pos": [0],
             "max_pos": [longest_seq],
-            "chromsizes": [[None, longest_seq]],
+            "chromsizes": chromsizes,
         }
 
     if cluster == "linkage":
@@ -40,19 +47,22 @@ def tile_functions(seqs, refseq, cluster=None, values=None):
 
     tile = []
     for i, seq in enumerate(seqs):
-        a = align_sequences(refseq, seq)
-        start, end, subs = alignment_to_subs(a)
+        for refseq in refseqs:
+            a = align_sequences(refseq["seq"], seq)
+            start, end, subs = alignment_to_subs(a)
 
-        tv = {
-            "id": f"r{i}",
-            "from": start,
-            "to": end,
-            "substitutions": subs,
-            "color": 0,
-        }
+            chr_offset = calc_chr_offset(chromsizes, refseq["id"])
 
-        if values:
-            tv["extra"] = values[i]
+            tv = {
+                "id": f"r{i}_{refseq['id']}",
+                "from": start + chr_offset,
+                "to": end + chr_offset,
+                "substitutions": subs,
+                "color": 0,
+            }
+
+            if values:
+                tv["extra"] = values[i]
 
         tile.append(tv)
 

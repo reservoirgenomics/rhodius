@@ -1,3 +1,7 @@
+from clodius.chromosomes import chromsizes_as_array
+import io
+
+
 # @lru_cache
 def csv_sequence_tileset_functions(
     filename,
@@ -7,6 +11,8 @@ def csv_sequence_tileset_functions(
     header=True,
     sep=",",
     refrow=None,
+    fasta_datafile=None,
+    chromsizes_datafile=None,
 ):
     """Read a csv file and return a list of sequences.
 
@@ -26,6 +32,7 @@ def csv_sequence_tileset_functions(
         The separator used in the csv file
     refrow: A row to use as a reference sequence when calculating
         alignments. Should be 1-based
+    fasta_datafile: A fasta file to align the sequences to.
     """
     import pandas as pd
 
@@ -40,16 +47,38 @@ def csv_sequence_tileset_functions(
     df = pd.read_csv(filename, header=header, sep=sep)
 
     if not colname:
-        colname = df.columns[colnum]
+        colname = df.columns[colnum - 1]
 
     sequences = df[colname].values
+    chromsizes = None
 
     if refrow:
-        refseq = sequences[refrow - 1]
+        refseqs = [{"id": refrow, "seq": sequences[refrow - 1]}]
+        chromsizes = [[f"row_{refrow}", len(sequences[refrow - 1])]]
     else:
-        refseq = None
+        if fasta_datafile:
+            from Bio import SeqIO
 
-    tf = tile_functions(sequences, refseq=refseq, values=df.to_dict(orient="records"))
+            refseqs = [
+                {"id": record.id, "seq": str(record.seq)}
+                for record in SeqIO.parse(
+                    io.TextIOWrapper(fasta_datafile, "utf-8"), "fasta"
+                )
+            ]
+
+            if chromsizes_datafile:
+                chromsizes = chromsizes_as_array(chromsizes_datafile)
+            else:
+                chromsizes = [[r["id"], len(r["seq"])] for r in refseqs]
+        else:
+            raise ValueError("No reference row or fasta file provided")
+
+    tf = tile_functions(
+        sequences,
+        refseqs=refseqs,
+        values=df.to_dict(orient="records"),
+        chromsizes=chromsizes,
+    )
 
     orig_tsinfo = tf["tileset_info"]()
     # Decorate the tileset info function so that it returns

@@ -190,7 +190,7 @@ def parse_gff_to_models(filtered_df, settings=None):
                 "ID",
                 f"{row.get('type')}_{row.get('start')}_{row.get('end')}",
             ),
-            "chrom": row.get("seqname"),
+            "chrom": row.get("seqid"),
             "start": row.get("start"),
             "end": row.get("end"),
             "strand": (
@@ -275,7 +275,6 @@ def parse_gff_to_models(filtered_df, settings=None):
         elif feature_type == "exon":
             exon = Exon(**entity_data)
             parent_id = attrs.get("Parent", "")
-            print("parent_id", parent_id)
             if parent_id in transcripts:
                 transcripts[parent_id].exons.append(exon)
             elif parent_id in pseudogenes:
