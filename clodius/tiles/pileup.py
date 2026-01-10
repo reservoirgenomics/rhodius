@@ -1,6 +1,9 @@
 from Bio import Align
+import mappy as mp
+import tempfile
 from clodius.alignment import align_sequences, alignment_to_subs, order_by_clustering
 from clodius.tiles.csv import csv_sequence_tileset_functions
+from clodius.tiles.bam import parse_cigar_string, get_cigar_substitutions
 
 
 def calc_chr_offset(chromsizes, chrom_id):
@@ -64,7 +67,7 @@ def tile_functions(seqs, refseqs, cluster=None, values=None, chromsizes=None):
             if values:
                 tv["extra"] = values[i]
 
-        tile.append(tv)
+            tile.append(tv)
 
     def tiles(tile_ids):
         tiles = []
@@ -79,6 +82,85 @@ def tile_functions(seqs, refseqs, cluster=None, values=None, chromsizes=None):
                 tiles += [(tile_id, [])]
             else:
                 # return the entire tile
+                tiles += [(tile_id, tile)]
+
+        return tiles
+
+    return {"tileset_info": tileset_info, "tiles": tiles}
+
+
+def tile_functions_fasta(seqs, refseqs, cluster=None, values=None, chromsizes=None):
+    """Return a dictionary of tile functions for the pileup track using FASTA and mappy."""
+    longest_seq = sum([c[1] for c in chromsizes])
+
+    def tileset_info():
+        return {
+            "tile_size": longest_seq,
+            "resolutions": [1],
+            "max_tile_width": longest_seq,
+            "format": "subs",
+            "min_pos": [0],
+            "max_pos": [longest_seq],
+            "chromsizes": chromsizes,
+        }
+
+    if cluster == "linkage":
+        seqs = order_by_clustering(seqs)
+
+    # Write refseqs to temp file in FASTA format
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".fasta", dir="/tmp", delete=False
+    ) as tmp_file:
+        for refseq in refseqs:
+            tmp_file.write(f">{refseq['id']}\n{refseq['seq']}\n")
+        tmp_filename = tmp_file.name
+
+    # Create mappy aligner from temp file
+    aligner = mp.Aligner(tmp_filename, preset="sr")
+
+    tile = []
+    for i, seq in enumerate(seqs):
+        for hit in aligner.map(seq):
+            # Convert mappy alignment to substitutions format
+            start = hit.r_st
+            end = hit.r_en
+            print(dir(hit))
+            # Find chromosome offset
+            chr_offset = calc_chr_offset(chromsizes, hit.ctg)
+
+            # Convert CIGAR string to substitutions
+            cigar_tuples = parse_cigar_string(hit.cigar_str)
+            print("cigar_str", hit.cigar_str)
+            print("cigar_tuples", cigar_tuples)
+
+            substitutions = get_cigar_substitutions(start, end - start, cigar_tuples)
+
+            print(substitutions)
+
+            tv = {
+                "id": f"r{i}_{hit.ctg}",
+                "from": start + chr_offset,
+                "to": end + chr_offset,
+                "substitutions": substitutions,
+                "color": 0,
+            }
+
+            if values:
+                tv["extra"] = values[i]
+
+            tile.append(tv)
+
+    def tiles(tile_ids):
+        tiles = []
+
+        for tile_id in tile_ids:
+            parts = tile_id.split(".")
+            z = int(parts[1])
+            x = int(parts[2])
+
+            if z != 0 and x != 0:
+                tiles += [(tile_id, [])]
+            else:
                 tiles += [(tile_id, tile)]
 
         return tiles
