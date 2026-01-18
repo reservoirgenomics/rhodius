@@ -219,9 +219,9 @@ def tile_functions_fasta(seqs, refseqs, cluster=None, values=None, chromsizes=No
     tile = []
     for i, seq in enumerate(seqs):
         for hit in aligner.map(seq, cs=True):
-            # Convert mappy alignment to substitutions format
-            start = hit.r_st
-            end = hit.r_en
+            # Convert mappy alignment to substitutions format (0-based to 1-based)
+            start = hit.r_st + 1
+            end = hit.r_en + 1
             # Find chromosome offset
             chr_offset = calc_chr_offset(chromsizes, hit.ctg)
 
