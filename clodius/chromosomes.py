@@ -21,10 +21,19 @@ def chromsizes_as_array(chromsizes_filename):
 
     f = chromsizes_filename
     if isinstance(chromsizes_filename, str):
-        f = open(chromsizes_filename)
+        f = open(chromsizes_filename, "rb")
 
     for line in f:
-        chromsizes += [line.strip().split("\t")]
+        chromsizes += [line.decode("utf8").strip().split("\t")]
+        if not len(chromsizes[-1]) >= 2:
+            raise ValueError(f"Invalid chromsizes line, only 1 tsv column: {line}")
+
+        try:
+            chromsizes[-1][1] = int(chromsizes[-1][1])
+        except ValueError:
+            raise ValueError(
+                f"Invalid chromsizes line, no integer in second column: {line}"
+            )
 
     return chromsizes
 

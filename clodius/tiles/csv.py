@@ -45,6 +45,7 @@ def csv_sequence_tileset_functions(
         raise ValueError("No colname or colnum specified")
 
     df = pd.read_csv(filename, header=header, sep=sep)
+    print("df", df)
 
     if not colname:
         colname = df.columns[colnum - 1]

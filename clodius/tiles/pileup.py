@@ -14,6 +14,104 @@ def calc_chr_offset(chromsizes, chrom_id):
         sum += chrom[1]
 
 
+import mappy as mp
+
+
+def get_substitutions(hit, seq):
+    """
+    :param hit: mappy.Alignment object (result of a.map())
+    :param seq: The query sequence string
+    """
+    substitutions = []
+
+    # mappy provides hit.cs (difference string)
+    # Format: :[len] (match), *[ref][query] (substitution), +[seq] (insertion), -[seq] (deletion)
+    # Example: :10*at:5+cc:2
+
+    curr_pos = 0  # Position relative to target start (hit.ts)
+    read_pos = 0  # Position relative to read start (including soft clipping)
+
+    # 1. Handle Leading Soft Clipping
+    # mappy.Alignment.cigar is a list of (length, op)
+    if hit.cigar[0][1] == 4:
+        sc_len = hit.cigar[0][0]
+        substitutions.append(
+            {"pos": -sc_len, "length": sc_len, "type": "S", "variant": seq[:sc_len]}
+        )
+        read_pos += sc_len
+
+    # 2. Parse the CS tag for Mismatches, Inserts, and Deletes
+    # We use regex to split the CS tag into its components
+    import re
+
+    cs_parts = re.findall(r"(:[0-9]+|\*[a-z][a-z]|\+[a-z]+|-[a-z]+)", hit.cs)
+
+    for part in cs_parts:
+        op = part[0]
+
+        if op == ":":  # Match
+            ln = int(part[1:])
+            curr_pos += ln
+            read_pos += ln
+
+        elif op == "*":  # Substitution (Mismatch)
+            # val is 'ag' meaning ref was 'a', read is 'g'
+            ref_base = part[1].upper()  # The first char is the REF
+            query_base = part[2].upper()  # The second char is the QUERY
+            substitutions.append(
+                {
+                    "pos": curr_pos,
+                    "length": 1,
+                    "type": "X",
+                    "base": ref_base,  # Original base
+                    "variant": query_base,  # Mismatched base
+                }
+            )
+            curr_pos += 1
+            read_pos += 1
+
+        elif op == "+":  # Insertion
+            val = part[1:].upper()
+            ins_len = len(val)
+            substitutions.append(
+                {
+                    "pos": curr_pos,
+                    "length": ins_len,
+                    "type": "I",
+                    "base": "",
+                    "variant": val.upper(),
+                }
+            )
+            read_pos += ins_len
+
+        elif op == "-":  # Deletion
+            val = part[1:].upper()
+            substitutions.append(
+                {
+                    "pos": curr_pos,
+                    "length": len(val),
+                    "type": "D",
+                    "base": val,  # Original bases that were deleted
+                    "variant": "",  # No variant base in query
+                }
+            )
+            curr_pos += len(val)
+
+    # 3. Handle Trailing Soft Clipping
+    if hit.cigar[-1][1] == 4:
+        sc_len = hit.cigar[-1][0]
+        substitutions.append(
+            {
+                "pos": hit.te - hit.ts,
+                "length": sc_len,
+                "type": "S",
+                "variant": seq[-sc_len:],
+            }
+        )
+
+    return substitutions
+
+
 def align_sequences(seq1, seq2):
     """Align two sequences to each other and return an alignment object."""
     aligner = Align.PairwiseAligner()
@@ -120,23 +218,14 @@ def tile_functions_fasta(seqs, refseqs, cluster=None, values=None, chromsizes=No
 
     tile = []
     for i, seq in enumerate(seqs):
-        for hit in aligner.map(seq):
+        for hit in aligner.map(seq, cs=True):
             # Convert mappy alignment to substitutions format
             start = hit.r_st
             end = hit.r_en
-            print(dir(hit))
             # Find chromosome offset
             chr_offset = calc_chr_offset(chromsizes, hit.ctg)
 
-            # Convert CIGAR string to substitutions
-            cigar_tuples = parse_cigar_string(hit.cigar_str)
-            print("cigar_str", hit.cigar_str)
-            print("cigar_tuples", cigar_tuples)
-
-            substitutions = get_cigar_substitutions(start, end - start, cigar_tuples)
-
-            print(substitutions)
-
+            substitutions = get_substitutions(hit, seq)
             tv = {
                 "id": f"r{i}_{hit.ctg}",
                 "from": start + chr_offset,
