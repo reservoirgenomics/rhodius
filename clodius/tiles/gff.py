@@ -11,6 +11,7 @@ from clodius.tiles.tabix import df_single_tile
 from clodius.utils import TILE_OPTIONS_CHAR
 from clodius.tiles.tabix import load_tbi_idx, single_indexed_tile
 from smart_open import open
+from uuid import uuid4
 
 
 def gff_chromsizes(filename):
@@ -285,6 +286,26 @@ def parse_gff_to_models(filtered_df, settings=None):
             parent_id = attrs.get("Parent", "")
             if parent_id in transcripts and isinstance(transcripts[parent_id], mRNA):
                 transcripts[parent_id].cds.append(cds)
+            else:
+                if not parent_id:
+                    parent_id = str(uuid4())
+                # Create transcript of type "cds" if it doesn't exist
+                transcript_data = entity_data.copy()
+                transcript_data["id"] = parent_id
+                transcript = mRNA(**transcript_data, parent_gene_id="")
+                transcripts[parent_id] = transcript
+                transcripts[parent_id].cds.append(cds)
+                # Create exon from CDS
+                exon = Exon(**entity_data)
+                transcripts[parent_id].exons.append(exon)
+                # Check if gene exists, create if it doesn't
+                gene_id = attrs.get("gene_id") or f"gene_{parent_id}"
+                if gene_id not in genes:
+                    gene_data = entity_data.copy()
+                    gene_data["id"] = gene_id
+                    gene = Gene(**gene_data)
+                    genes[gene_id] = GeneModel(gene=gene)
+                transcripts[parent_id].parent_gene_id = gene_id
 
         # Skip unmodeled features: mobile_genetic_element, region, sequence_feature
 
