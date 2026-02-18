@@ -23,10 +23,10 @@ def test_tiles():
     assert len(tiles) == 1
     assert tiles[0][0] == "x.0.0"
 
-    assert len(tiles[0][1][0].keys()) > 20
+    assert len(tiles[0][1]["genes"].keys()) > 20
 
     tiles1 = ctg.tiles(filename, ["x.1.0"])
-    assert len(tiles1[0][1][0].keys()) < len(tiles[0][1][0].keys())
+    assert len(tiles1[0][1]["genes"].keys()) < len(tiles[0][1]["genes"].keys())
 
 
 def test_indexed_tiles():
@@ -37,6 +37,6 @@ def test_indexed_tiles():
     assert len(tiles) == 1
 
     # genes
-    assert len(tiles[0][1][0].keys()) > 10
+    assert len(tiles[0][1]["genes"].keys()) > 10
     # transcripts
-    assert len(tiles[0][1][1].keys()) > 10
+    assert len(tiles[0][1]["transcripts"].keys()) > 10

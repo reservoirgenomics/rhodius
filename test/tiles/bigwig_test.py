@@ -106,14 +106,15 @@ def test_tileset_info():
     tileset_info = hgbi.tileset_info(filename)
 
     assert len(tileset_info["aggregation_modes"]) == 5
-    assert tileset_info["aggregation_modes"]["mean"]
-    assert tileset_info["aggregation_modes"]["min"]
-    assert tileset_info["aggregation_modes"]["max"]
-    assert tileset_info["aggregation_modes"]["std"]
+
+    assert "mean" in [m["value"] for m in tileset_info["aggregation_modes"]]
+    assert "min" in [m["value"] for m in tileset_info["aggregation_modes"]]
+    assert "max" in [m["value"] for m in tileset_info["aggregation_modes"]]
+    assert "std" in [m["value"] for m in tileset_info["aggregation_modes"]]
 
     assert len(tileset_info["range_modes"]) == 2
-    assert tileset_info["range_modes"]["minMax"]
-    assert tileset_info["range_modes"]["whisker"]
+    assert "minMax" in [m["value"] for m in tileset_info["range_modes"]]
+    assert "whisker" in [m["value"] for m in tileset_info["range_modes"]]
 
 
 def test_natsorted():

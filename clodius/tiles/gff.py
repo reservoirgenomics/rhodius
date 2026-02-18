@@ -151,7 +151,7 @@ def convert_raw_to_gff_df(raw_data):
         if len(parts) >= 9:
             rows.append(
                 {
-                    "seqname": parts[0],
+                    "seqid": parts[0],
                     "source": parts[1],
                     "type": parts[2],
                     "start": int(parts[3]),
@@ -322,7 +322,7 @@ def parse_gff_to_models(filtered_df, settings=None):
     for key in transcripts:
         transcripts[key] = transcripts[key].model_dump()
 
-    return {"genes": all_genes, "transcripts": transcripts}
+    return all_genes, transcripts
 
 
 def tiles(filename, tile_ids, chromsizes=None, index_filename=None, settings=None):
@@ -339,7 +339,8 @@ def tiles(filename, tile_ids, chromsizes=None, index_filename=None, settings=Non
             mode="gff",
         )
 
-        return parse_gff_to_models(df)
+        genes, transcripts = parse_gff_to_models(df)
+        return {"genes": genes, "transcripts": transcripts}
 
     if isinstance(filename, str):
         file = open(filename, "rb", compression="disable")
@@ -383,7 +384,8 @@ def tiles(filename, tile_ids, chromsizes=None, index_filename=None, settings=Non
                 # for row in raw_data.iter_rows(named=True):
                 #     print(row)
                 converted_df = convert_raw_to_gff_df(raw_data)
-                values = parse_gff_to_models(converted_df)
+                genes, transcripts = parse_gff_to_models(converted_df)
+                values = {"genes": genes, "transcripts": transcripts}
             except ValueError as ve:
                 values = {"error": str(ve)}
         else:

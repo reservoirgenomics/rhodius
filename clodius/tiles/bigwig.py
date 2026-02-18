@@ -164,7 +164,7 @@ def tileset_info(bwpath, chromsizes=None):
         "max_zoom": max_zoom,
         "chromsizes": chromsizes_list,
         "aggregation_modes": list(aggregation_modes.values()),
-        "range_modes": range_modes,
+        "range_modes": list(range_modes.values()),
     }
     return tileset_info
 
