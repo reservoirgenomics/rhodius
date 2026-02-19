@@ -1,9 +1,25 @@
 from Bio import Align
-import mappy as mp
 import tempfile
 from clodius.alignment import align_sequences, alignment_to_subs, order_by_clustering
 from clodius.tiles.csv import csv_sequence_tileset_functions
 from clodius.tiles.bam import parse_cigar_string, get_cigar_substitutions
+
+
+def get_subs(alignment):
+    """Wrapper for alignment_to_subs that returns the result."""
+    return alignment_to_subs(alignment)
+
+
+def get_pileup_alignment_data(refseq, seqs, cluster=None, values=None):
+    """Get pileup alignment data for a reference sequence and a list of sequences."""
+    chromsizes = [("ref", len(refseq))]
+    refseqs = [{"id": "ref", "seq": refseq}]
+    
+    tf = tile_functions(seqs, refseqs, cluster=cluster, values=values, chromsizes=chromsizes)
+    tsinfo = tf["tileset_info"]()
+    tiles = tf["tiles"](["0.0"])
+    
+    return {"type": tsinfo, "tiles": dict(tiles)}
 
 
 def calc_chr_offset(chromsizes, chrom_id):
@@ -12,9 +28,6 @@ def calc_chr_offset(chromsizes, chrom_id):
         if chrom[0] == chrom_id:
             return sum
         sum += chrom[1]
-
-
-import mappy as mp
 
 
 def get_substitutions(hit, seq):
@@ -189,6 +202,8 @@ def tile_functions(seqs, refseqs, cluster=None, values=None, chromsizes=None):
 
 def tile_functions_fasta(seqs, refseqs, cluster=None, values=None, chromsizes=None):
     """Return a dictionary of tile functions for the pileup track using FASTA and mappy."""
+    import mappy as mp
+
     longest_seq = sum([c[1] for c in chromsizes])
 
     def tileset_info():
