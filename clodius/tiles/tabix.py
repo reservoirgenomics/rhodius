@@ -1,13 +1,15 @@
 import collections as col
 import gzip
-import math
-import random
 import struct
-import zlib
+import polars as pl
+import pandas as pd
+from typing import Literal
 
 import numpy as np
+from smart_open import open
 
 from clodius.tiles.bigwig import abs2genomic
+from clodius.utils import get_file_compression
 
 
 def load_bai_index(index_file):
@@ -41,12 +43,6 @@ def load_bai_index(index_file):
         indeces += [bins]
 
     return indeces
-
-
-def load_tbi_idx(index_filename):
-    """Load a reduced version of a tabix index so that we can
-    go through it and get a sense of how much data will be
-    retrieved by a query."""
 
 
 def load_tbi_idx(index_filename):
@@ -166,35 +162,55 @@ def est_query_size(index, name, start, end):
     return est_query_size_ix(ix, start, end)
 
 
+def dataframe_tabix_fetcher(file, index, ref, start, end):
+    """Fetch rows of a tabix indexed file into a dataframe."""
+    import oxbow as ox
+
+    if isinstance(index, str):
+        index = open(index, "rb", compression="disable")
+
+    if start == 0:
+        start = 1
+    pos = f"{ref}:{start}-{end}"
+
+    file.seek(0)
+    index.seek(0)
+
+    try:
+        arrow_ipc = ox.read_tabix(file, pos, index)
+    except ValueError as ex:
+        if "missing reference sequence" in str(ex):
+            return None
+        raise
+
+    df = pl.read_ipc(arrow_ipc)
+    return df
+
+
 def single_indexed_tile(
-    filename,
-    index_filename,
+    file,
+    index,
     chromsizes,
     tsinfo,
     z,
     x,
-    max_tile_width,
     tbx_index,
-    fetcher,
+    fetcher=dataframe_tabix_fetcher,
+    max_tile_width=None,
     max_results=None,
 ):
-    if max_results is None:
-        max_results = 2048
-
     tile_width = tsinfo["max_width"] / 2**z
 
     if max_tile_width and tile_width > max_tile_width:
-        return {"error": "Tile too wide"}
+        raise ValueError(f"Tile too wide {tile_width}. Max width: {max_tile_width}.")
 
     query_size = 0
 
     start_pos = x * tsinfo["max_width"] / 2**z
     end_pos = (x + 1) * tsinfo["max_width"] / 2**z
 
-    css = chromsizes.cumsum().shift().fillna(0).to_dict()
-
     cids_starts_ends = list(abs2genomic(chromsizes, start_pos, end_pos))
-    ret_vals = []
+    ret_vals = None
 
     if tbx_index:
         for cid, start, end in cids_starts_ends:
@@ -208,17 +224,83 @@ def single_indexed_tile(
     MAX_QUERY_SIZE = 1000000
 
     if query_size > MAX_QUERY_SIZE:
-        return {"error": f"Tile too large {query_size}"}
+        raise ValueError(f"Tile too large {query_size}")
 
     for cid, start, end in cids_starts_ends:
         if cid >= len(chromsizes):
             continue
 
         chrom = chromsizes.index[cid]
+        df = fetcher(file, index, str(chrom), int(start), int(end))
+        if df is not None:
+            if ret_vals is None:
+                ret_vals = df
+            else:
+                ret_vals = pl.concat([ret_vals, df])
 
-        ret_vals += fetcher(str(chrom), int(start), int(end))
-
-    if len(ret_vals) > max_results:
-        return {"error": f"Too many values in tile {len(ret_vals)}"}
+    if max_results and len(ret_vals) > max_results:
+        raise ValueError(f"Too many values in tile {len(ret_vals)}")
 
     return ret_vals
+
+
+def df_single_tile(filename, chromsizes, tsinfo, z, x, mode: Literal["gff", "bed"]):
+    """Load a single tile from the filename."""
+    tile_width = tsinfo["max_width"] / 2**z
+    start_pos = x * tile_width
+    end_pos = (x + 1) * tile_width
+
+    cids_starts_ends = list(abs2genomic(chromsizes, start_pos, end_pos))
+
+    # Reset file position to beginning if it's a file object
+    if hasattr(filename, "seek"):
+        filename.seek(0)
+
+    df = pl.from_pandas(
+        pd.read_csv(
+            filename,
+            delimiter="\t",
+            header=None,
+            comment="#",
+            compression=get_file_compression(filename),
+        )
+    )
+
+    if mode == "gff":
+        df.columns = [
+            "seqid",
+            "source",
+            "type",
+            "start",
+            "end",
+            "score",
+            "strand",
+            "phase",
+            "attributes",
+        ]
+
+    filtered_rows = []
+
+    for cid, tile_start, tile_end in cids_starts_ends:
+        if cid >= len(chromsizes):
+            continue
+
+        chrom = chromsizes.index[cid]
+
+        if mode == "gff":
+            chrom_col, start_col, end_col = "seqid", "start", "end"
+        else:  # bed
+            chrom_col, start_col, end_col = "column_1", "column_2", "column_3"
+
+        mask = (
+            (df[chrom_col] == chrom)
+            & (df[end_col] > tile_start)
+            & (df[start_col] < tile_end)
+        )
+
+        filtered_rows.append(df.filter(mask))
+
+    if filtered_rows:
+        return pl.concat(filtered_rows)
+    else:
+        return pl.DataFrame()

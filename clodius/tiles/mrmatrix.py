@@ -4,7 +4,11 @@ from clodius.tiles.utils import tiles_wrapper_2d
 from clodius.tiles.format import format_dense_tile
 
 def tileset_info(file, bounds=None):
-    f = h5py.File(file, "r")
+    if isinstance(file, (str, bytes)) or hasattr(file, '__fspath__'):
+        f = h5py.File(file, "r")
+    else:
+        # Already an h5py-like object or mock
+        f = file
 
     if 'min-pos' in f.attrs:
         min_pos = f.attrs['min-pos']
@@ -39,7 +43,11 @@ def single_tile(file, z,x,y):
     y: int
         The tile's y position
     '''
-    f = h5py.File(file, "r")
+    if isinstance(file, (str, bytes)) or hasattr(file, '__fspath__'):
+        f = h5py.File(file, "r")
+    else:
+        # Already an h5py-like object or mock
+        f = file
 
     resolutions = sorted(map(int, f['resolutions'].keys()))[::-1]
     tsinfo = tileset_info(file)

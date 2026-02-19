@@ -211,6 +211,9 @@ def create_multivec_multires(
 
     # add the row_info information
     if row_infos is not None:
+        # Convert bytes to strings if necessary
+        if isinstance(row_infos, (list, tuple)):
+            row_infos = [r.decode('utf-8') if isinstance(r, bytes) else r for r in row_infos]
         f["info"].create_dataset("row_infos", data=json.dumps(row_infos))
 
     # add the chromosome information

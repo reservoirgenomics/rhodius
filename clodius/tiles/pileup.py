@@ -1,6 +1,128 @@
 from Bio import Align
+import tempfile
 from clodius.alignment import align_sequences, alignment_to_subs, order_by_clustering
 from clodius.tiles.csv import csv_sequence_tileset_functions
+from clodius.tiles.bam import parse_cigar_string, get_cigar_substitutions
+
+
+def get_subs(alignment):
+    """Wrapper for alignment_to_subs that returns the result."""
+    return alignment_to_subs(alignment)
+
+
+def get_pileup_alignment_data(refseq, seqs, cluster=None, values=None):
+    """Get pileup alignment data for a reference sequence and a list of sequences."""
+    chromsizes = [("ref", len(refseq))]
+    refseqs = [{"id": "ref", "seq": refseq}]
+    
+    tf = tile_functions(seqs, refseqs, cluster=cluster, values=values, chromsizes=chromsizes)
+    tsinfo = tf["tileset_info"]()
+    tiles = tf["tiles"](["0.0"])
+    
+    return {"type": tsinfo, "tiles": dict(tiles)}
+
+
+def calc_chr_offset(chromsizes, chrom_id):
+    sum = 0
+    for chrom in chromsizes:
+        if chrom[0] == chrom_id:
+            return sum
+        sum += chrom[1]
+
+
+def get_substitutions(hit, seq):
+    """
+    :param hit: mappy.Alignment object (result of a.map())
+    :param seq: The query sequence string
+    """
+    substitutions = []
+
+    # mappy provides hit.cs (difference string)
+    # Format: :[len] (match), *[ref][query] (substitution), +[seq] (insertion), -[seq] (deletion)
+    # Example: :10*at:5+cc:2
+
+    curr_pos = 0  # Position relative to target start (hit.ts)
+    read_pos = 0  # Position relative to read start (including soft clipping)
+
+    # 1. Handle Leading Soft Clipping
+    # mappy.Alignment.cigar is a list of (length, op)
+    if hit.cigar[0][1] == 4:
+        sc_len = hit.cigar[0][0]
+        substitutions.append(
+            {"pos": -sc_len, "length": sc_len, "type": "S", "variant": seq[:sc_len]}
+        )
+        read_pos += sc_len
+
+    # 2. Parse the CS tag for Mismatches, Inserts, and Deletes
+    # We use regex to split the CS tag into its components
+    import re
+
+    cs_parts = re.findall(r"(:[0-9]+|\*[a-z][a-z]|\+[a-z]+|-[a-z]+)", hit.cs)
+
+    for part in cs_parts:
+        op = part[0]
+
+        if op == ":":  # Match
+            ln = int(part[1:])
+            curr_pos += ln
+            read_pos += ln
+
+        elif op == "*":  # Substitution (Mismatch)
+            # val is 'ag' meaning ref was 'a', read is 'g'
+            ref_base = part[1].upper()  # The first char is the REF
+            query_base = part[2].upper()  # The second char is the QUERY
+            substitutions.append(
+                {
+                    "pos": curr_pos,
+                    "length": 1,
+                    "type": "X",
+                    "base": ref_base,  # Original base
+                    "variant": query_base,  # Mismatched base
+                }
+            )
+            curr_pos += 1
+            read_pos += 1
+
+        elif op == "+":  # Insertion
+            val = part[1:].upper()
+            ins_len = len(val)
+            substitutions.append(
+                {
+                    "pos": curr_pos,
+                    "length": ins_len,
+                    "type": "I",
+                    "base": "",
+                    "variant": val.upper(),
+                }
+            )
+            read_pos += ins_len
+
+        elif op == "-":  # Deletion
+            val = part[1:].upper()
+            substitutions.append(
+                {
+                    "pos": curr_pos,
+                    "length": len(val),
+                    "type": "D",
+                    "base": val,  # Original bases that were deleted
+                    "variant": "",  # No variant base in query
+                }
+            )
+            curr_pos += len(val)
+
+    # 3. Handle Trailing Soft Clipping
+    if hit.cigar[-1][1] == 4:
+        sc_len = hit.cigar[-1][0]
+        substitutions.append(
+            {
+                "pos": hit.te - hit.ts,
+                "length": sc_len,
+                "type": "S",
+                "variant": seq[-sc_len:],
+            }
+        )
+
+    return substitutions
 
 
 def align_sequences(seq1, seq2):
@@ -19,10 +141,9 @@ def align_sequences(seq1, seq2):
     return best_alignment
 
 
-def tile_functions(seqs, refseq, cluster=None, values=None):
+def tile_functions(seqs, refseqs, cluster=None, values=None, chromsizes=None):
     """Return a dictionary of tile functions for the pileup track."""
-
-    longest_seq = max([len(s) for s in seqs])
+    longest_seq = sum([c[1] for c in chromsizes])
 
     def tileset_info():
         return {
@@ -32,7 +153,7 @@ def tile_functions(seqs, refseq, cluster=None, values=None):
             "format": "subs",
             "min_pos": [0],
             "max_pos": [longest_seq],
-            "chromsizes": [[None, longest_seq]],
+            "chromsizes": chromsizes,
         }
 
     if cluster == "linkage":
@@ -40,21 +161,24 @@ def tile_functions(seqs, refseq, cluster=None, values=None):
 
     tile = []
     for i, seq in enumerate(seqs):
-        a = align_sequences(refseq, seq)
-        start, end, subs = alignment_to_subs(a)
+        for refseq in refseqs:
+            a = align_sequences(refseq["seq"], seq)
+            start, end, subs = alignment_to_subs(a)
 
-        tv = {
-            "id": f"r{i}",
-            "from": start,
-            "to": end,
-            "substitutions": subs,
-            "color": 0,
-        }
+            chr_offset = calc_chr_offset(chromsizes, refseq["id"])
 
-        if values:
-            tv["extra"] = values[i]
+            tv = {
+                "id": f"r{i}_{refseq['id']}",
+                "from": start + chr_offset,
+                "to": end + chr_offset,
+                "substitutions": subs,
+                "color": 0,
+            }
 
-        tile.append(tv)
+            if values:
+                tv["extra"] = values[i]
+
+            tile.append(tv)
 
     def tiles(tile_ids):
         tiles = []
@@ -69,6 +193,78 @@ def tile_functions(seqs, refseq, cluster=None, values=None):
                 tiles += [(tile_id, [])]
             else:
                 # return the entire tile
+                tiles += [(tile_id, tile)]
+
+        return tiles
+
+    return {"tileset_info": tileset_info, "tiles": tiles}
+
+
+def tile_functions_fasta(seqs, refseqs, cluster=None, values=None, chromsizes=None):
+    """Return a dictionary of tile functions for the pileup track using FASTA and mappy."""
+    import mappy as mp
+
+    longest_seq = sum([c[1] for c in chromsizes])
+
+    def tileset_info():
+        return {
+            "tile_size": longest_seq,
+            "resolutions": [1],
+            "max_tile_width": longest_seq,
+            "format": "subs",
+            "min_pos": [0],
+            "max_pos": [longest_seq],
+            "chromsizes": chromsizes,
+        }
+
+    if cluster == "linkage":
+        seqs = order_by_clustering(seqs)
+
+    # Write refseqs to temp file in FASTA format
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".fasta", dir="/tmp", delete=False
+    ) as tmp_file:
+        for refseq in refseqs:
+            tmp_file.write(f">{refseq['id']}\n{refseq['seq']}\n")
+        tmp_filename = tmp_file.name
+
+    # Create mappy aligner from temp file
+    aligner = mp.Aligner(tmp_filename, preset="sr")
+
+    tile = []
+    for i, seq in enumerate(seqs):
+        for hit in aligner.map(seq, cs=True):
+            # Convert mappy alignment to substitutions format (0-based to 1-based)
+            start = hit.r_st + 1
+            end = hit.r_en + 1
+            # Find chromosome offset
+            chr_offset = calc_chr_offset(chromsizes, hit.ctg)
+
+            substitutions = get_substitutions(hit, seq)
+            tv = {
+                "id": f"r{i}_{hit.ctg}",
+                "from": start + chr_offset,
+                "to": end + chr_offset,
+                "substitutions": substitutions,
+                "color": 0,
+            }
+
+            if values:
+                tv["extra"] = values[i]
+
+            tile.append(tv)
+
+    def tiles(tile_ids):
+        tiles = []
+
+        for tile_id in tile_ids:
+            parts = tile_id.split(".")
+            z = int(parts[1])
+            x = int(parts[2])
+
+            if z != 0 and x != 0:
+                tiles += [(tile_id, [])]
+            else:
                 tiles += [(tile_id, tile)]
 
         return tiles

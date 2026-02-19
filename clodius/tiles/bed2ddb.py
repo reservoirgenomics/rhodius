@@ -93,8 +93,9 @@ def get_1d_tiles(filepath, zoom: int, tile_x_pos: int, num_tiles: int = 1):
     ts_info = tileset_info(filepath)
 
     with apsw.Connection(
-        db_file, vfs=sovfs.name, flags=apsw.SQLITE_OPEN_READONLY
+        filepath, vfs=sovfs.name, flags=apsw.SQLITE_OPEN_READONLY
     ) as conn:
+        c = conn.cursor()
 
         tile_width = ts_info["max_width"] / 2 ** zoom
 

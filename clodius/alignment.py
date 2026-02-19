@@ -114,6 +114,11 @@ def alignment_to_subs(alignment):
         tpos = te
         qpos = qe
 
+    # Handle trailing insertion in query sequence
+    query_len = len(alignment.query)
+    if qpos < query_len:
+        parts += [{"pos": ttrue, "type": "I", "length": query_len - qpos}]
+
     return start + 1, end + 1, parts
 
 

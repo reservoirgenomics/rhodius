@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_array_equal
 
-from clodius.tiles.mrmatrix import tiles, tileset_info
+from clodius.tiles.mrmatrix import tiles, tileset_info, single_tile
 
 
 class MockHdf5(dict):
@@ -54,7 +54,7 @@ class TilesTest(unittest.TestCase):
                 {"resolutions": {"1": {"values": np.array([[1, 2], [3, 4]])}}}
             )
             tileset_stub.attrs = {}
-            tiles(tileset_stub, 2, 0, 0)
+            single_tile(tileset_stub, 2, 0, 0)
 
         self.assertRaisesRegex(ValueError, r"Zoom level out of bounds", should_fail)
 
@@ -72,7 +72,7 @@ class TilesTest(unittest.TestCase):
             }
         )
         tileset.attrs = {}
-        zoomed = tiles(tileset, 0, 0, 0)
+        zoomed = single_tile(tileset, 0, 0, 0)
         self.assertEqual(zoomed.shape, (256, 256))
         assert_array_equal(zoomed[0:2, 0:2], [[1, 2], [3, 4]])
         assert_array_equal(zoomed[2:256, 0], [np.nan for x in range(254)])
@@ -91,11 +91,11 @@ class TilesTest(unittest.TestCase):
         )
         tileset.attrs = {}
 
-        zoomed_0 = tiles(tileset, 0, 0, 0)
+        zoomed_0 = single_tile(tileset, 0, 0, 0)
         self.assertEqual(zoomed_0.shape, (256, 256))
         self.assertEqual(zoomed_0[0, 0], 0)
 
-        zoomed_1 = tiles(tileset, 0, 1, 1)
+        zoomed_1 = single_tile(tileset, 0, 1, 1)
         self.assertEqual(zoomed_1.shape, (256, 256))
         self.assertEqual(zoomed_1[0, 0], 256)
 
@@ -117,11 +117,11 @@ class TilesTest(unittest.TestCase):
         )
         tileset.attrs = {}
 
-        zoomed_0 = tiles(tileset, 0, 0, 0)
+        zoomed_0 = single_tile(tileset, 0, 0, 0)
         assert_array_equal(zoomed_0[0:2, 0:2], [[5, 6], [7, 8]])
 
-        zoomed_1 = tiles(tileset, 1, 0, 0)
+        zoomed_1 = single_tile(tileset, 1, 0, 0)
         assert_array_equal(zoomed_1[0:2, 0:2], [[3, 4], [5, 6]])
 
-        zoomed_2 = tiles(tileset, 2, 0, 0)
+        zoomed_2 = single_tile(tileset, 2, 0, 0)
         assert_array_equal(zoomed_2[0:2, 0:2], [[1, 2], [3, 4]])

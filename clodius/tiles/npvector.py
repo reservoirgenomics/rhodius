@@ -26,7 +26,11 @@ def tileset_info(array, bounds=None, bins_per_dimension=1024):
     """
     Get the tileset info for the array
     """
-    max_dim = array.shape[1]
+    # Handle 1D arrays
+    if len(array.shape) == 1:
+        max_dim = array.shape[0]
+    else:
+        max_dim = array.shape[1]
 
     max_zoom = math.ceil(math.log(max_dim / bins_per_dimension) / math.log(2))
     max_zoom = 0 if max_zoom < 0 else max_zoom
@@ -44,7 +48,10 @@ def tileset_info(array, bounds=None, bins_per_dimension=1024):
         max_width = (max_pos[0] - min_pos[0]) * scale_up
     else:
         min_pos = [0]
-        max_pos = [array.shape[1]]
+        if len(array.shape) == 1:
+            max_pos = [array.shape[0]]
+        else:
+            max_pos = [array.shape[1]]
 
     # Now supports nxm arrays, not just nx1
     # if len(array.shape) > 1:

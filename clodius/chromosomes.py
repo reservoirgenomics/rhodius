@@ -15,6 +15,29 @@ def chromsizes_array_to_series(chromsizes):
     return pd.Series(np.array([int(c) for c in chrvalues]), index=chrnames)
 
 
+def chromsizes_as_array(chromsizes_filename):
+    """Load chromosome sizes as an array."""
+    chromsizes = []
+
+    f = chromsizes_filename
+    if isinstance(chromsizes_filename, str):
+        f = open(chromsizes_filename, "rb")
+
+    for line in f:
+        chromsizes += [line.decode("utf8").strip().split("\t")]
+        if not len(chromsizes[-1]) >= 2:
+            raise ValueError(f"Invalid chromsizes line, only 1 tsv column: {line}")
+
+        try:
+            chromsizes[-1][1] = int(chromsizes[-1][1])
+        except ValueError:
+            raise ValueError(
+                f"Invalid chromsizes line, no integer in second column: {line}"
+            )
+
+    return chromsizes
+
+
 def chromsizes_as_series(chromsizes_filename):
     """Load chromosome sizes as a pandas series."""
     chromsizes = []
